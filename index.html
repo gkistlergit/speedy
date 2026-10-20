@@ -102,21 +102,11 @@
 
     <!-- VIDEO -->
     <section class="tab video-tab" id="tab-video" data-tab="video" hidden>
-      <div class="vwrap">
-        <div class="screen">
-          <canvas class="ambient" id="ambient" aria-hidden="true"></canvas>
-          <div class="player" id="player" data-state="idle">
-            <canvas id="film" aria-label="Test video"></canvas>
-            <div class="hud">
-              <span class="qbadge" id="qBadge"><b>1080p</b><small>Full HD</small></span>
-              <span class="vrate" id="vRate"></span>
-            </div>
-            <div class="spinner" id="spinner" aria-hidden="true"></div>
-            <button class="bigplay" id="bigPlay" aria-label="Start video test"><svg viewBox="0 0 24 24"><path d="M8 5.2v13.6a.8.8 0 0 0 1.2.7l10.6-6.8a.8.8 0 0 0 0-1.4L9.2 4.5A.8.8 0 0 0 8 5.2z" fill="currentColor"/></svg></button>
-            <div class="scrub"><i class="buf" id="vBuf"></i><i class="pos" id="vPos"></i></div>
-          </div>
-        </div>
-        <div class="vpanel" id="vPanel"></div>
+      <canvas id="swirl"></canvas>
+      <div class="video-overlay" id="videoOverlay"></div>
+      <div class="video-status" id="videoStatus" hidden>
+        <div class="vprog"><i id="vprog"></i></div>
+        <div class="vstat-row"><span class="conn-mini" id="vConn"></span><span id="vText">Testing adaptive bitrate…</span></div>
       </div>
     </section>
 

@@ -227,12 +227,11 @@ export function bloatGrade(idle, loadedDown, loadedUp) {
 // Plays simulated 2-second video segments at each quality's real-world
 // bitrate, the way a streaming player does, and checks whether each one
 // arrives faster than it would play (no buffering).
-// Bitrates are YouTube's recommended sustained speeds for each quality.
 export const LADDER = [
-  { q: '360p', px: 360, tier: 'SD', mbps: 0.75 }, { q: '480p', px: 480, tier: 'SD', mbps: 1.2 }, { q: '720p', px: 720, tier: 'HD', mbps: 2.5 },
-  { q: '1080p', px: 1080, tier: 'Full HD', mbps: 5 }, { q: '1440p', px: 1440, tier: 'QHD', mbps: 10 }, { q: '4K', px: 2160, tier: 'Ultra HD', mbps: 20 },
+  { q: '360p', mbps: 0.75 }, { q: '480p', mbps: 1.2 }, { q: '720p', mbps: 2.5 },
+  { q: '1080p', mbps: 5 }, { q: '1440p', mbps: 10 }, { q: '4K', mbps: 20 },
 ];
-export async function videoTest({ onStep, signal, pace } = {}) {
+export async function videoTest({ onStep, signal } = {}) {
   const SEG = 2; const out = []; let totalBytes = 0;
   for (const rung of LADDER) {
     if (signal && signal.aborted) throw new DOMException('cancelled', 'AbortError');
@@ -241,7 +240,6 @@ export async function videoTest({ onStep, signal, pace } = {}) {
     onStep && onStep({ rung, phase: 'start' });
     for (let s = 0; s < 4; s++) {
       const t0 = performance.now();
-      onStep && onStep({ rung, phase: 'segstart', s, deadline: SEG * 1000 * 0.9 });
       try {
         const r = await fetch(`${CF}/__down?bytes=${segBytes}&r=${rnd()}`, { cache: 'no-store', signal });
         await r.arrayBuffer();
@@ -250,16 +248,13 @@ export async function videoTest({ onStep, signal, pace } = {}) {
       if (startup == null) startup = ms;
       times.push(ms);
       if (ms > SEG * 1000 * 0.9) fails++;
-      onStep && onStep({ rung, phase: 'segment', s, ms, throughput: toMbps(segBytes, ms) });
+      onStep && onStep({ rung, phase: 'segment', ms, throughput: toMbps(segBytes, ms) });
       if (fails >= 2) break;
     }
     const ok = fails < 2;
-    const sorted = [...times].sort((a, b) => a - b), median = sorted.length ? sorted[sorted.length >> 1] : null;
-    const measured = median ? toMbps(segBytes, median) : null;
-    const res = { q: rung.q, mbps: rung.mbps, ok, startup, buffering: fails, avgMs: times.length ? times.reduce((a, b) => a + b) / times.length : null, measured };
+    const res = { q: rung.q, mbps: rung.mbps, ok, startup, buffering: fails, avgMs: times.length ? times.reduce((a, b) => a + b) / times.length : null };
     out.push(res);
     onStep && onStep({ rung, phase: 'done', res });
-    if (pace) await pace();
     if (!ok) break;
   }
   const best = [...out].reverse().find((r) => r.ok);

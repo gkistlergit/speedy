@@ -1,6 +1,6 @@
 import * as net from './net.js';
 import { kv, results, outages, loadSettings, saveSettings, uid } from './store.js';
-import { createPlayer, createGauge, lineChart, barChart, sparkline, cssVar } from './visuals.js';
+import { createSwirl, createGauge, lineChart, barChart, sparkline, cssVar } from './visuals.js';
 import { SERVICES } from './services.js';
 
 // ---------- helpers ----------
@@ -40,7 +40,7 @@ const S = {
   hist: { seg: 'speed', conn: 'all', range: 30 }, placing: null,
   video: { state: 'idle', result: null },
 };
-let gauge, player;
+let gauge, swirl;
 
 // ---------- boot ----------
 async function boot() {
@@ -49,7 +49,7 @@ async function boot() {
   S.outages = ((await outages.all()) || []).sort((a, b) => a.start - b.start);
   S.status = (await kv.get('status')) || S.status;
   gauge = createGauge($('#gauge'));
-  player = createPlayer($('#film'), $('#ambient'));
+  swirl = createSwirl($('#swirl'));
   wire();
   renderInfo();
   const hashTab = (location.hash || '').slice(1);
@@ -101,6 +101,7 @@ function renderInfo() {
   $('#connChip').innerHTML = `${label}${S.settings.connMode === 'auto' ? ' (auto)' : ''} ▾`;
   const where = S.info?.colo ? `Server ${S.info.colo}` : S.info?.city ? `Near ${S.info.city}` : 'Cloudflare';
   $('#serverChip').textContent = where;
+  $('#vConn').innerHTML = ICON[c] || ICON.unknown;
 }
 
 // ---------- navigation ----------
@@ -109,7 +110,7 @@ function show(tab) {
   S.tab = tab;
   $$('.tab').forEach((el) => (el.hidden = el.dataset.tab !== tab));
   $$('#tabbar button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
-  if (tab === 'video') { player.start(); renderVideo(); } else player.stop();
+  if (tab === 'video') { swirl.start(); renderVideo(); } else swirl.stop();
   if (tab === 'status') { renderStatus(); autoCheckFavorites(); }
   if (tab === 'map') renderMap();
   if (tab === 'history') renderHistory();
@@ -136,8 +137,7 @@ function wire() {
   $('#histSeg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; S.hist.seg = b.dataset.v; $$('#histSeg button').forEach((x) => x.classList.toggle('on', x === b)); renderHistory(); });
   $('#histBody').addEventListener('click', onHistoryClick);
   $('#histBody').addEventListener('change', onHistoryChange);
-  $('#bigPlay').addEventListener('click', runVideo);
-  $('#vPanel').addEventListener('click', (e) => { if (e.target.closest('[data-act="video"]')) runVideo(); if (e.target.closest('[data-act="vcancel"]')) S.abort && S.abort.abort(); });
+  $('#videoOverlay').addEventListener('click', (e) => { if (e.target.closest('[data-act="video"]')) runVideo(); if (e.target.closest('[data-act="vcancel"]')) S.abort && S.abort.abort(); });
   $('#resultView').addEventListener('click', (e) => { if (e.target.closest('[data-act="again"]')) runSpeed(); if (e.target.closest('[data-act="settings"]')) openSettings(); });
   window.addEventListener('online', () => S.settings.watch && watchTick());
   window.addEventListener('offline', () => S.settings.watch && watchTick());
@@ -274,79 +274,50 @@ function showResult(r) {
 }
 
 // ---------- video test ----------
-const fmtRate = (m) => (m >= 100 ? Math.round(m) : m >= 10 ? m.toFixed(0) : m.toFixed(1));
-function setBadge(rung) { $('#qBadge').innerHTML = `<b>${rung.q}</b><small>${rung.tier}</small>`; player.quality(rung.px); }
-function ladderChips(states) {
-  return `<ol class="vladder">${net.LADDER.map((r, i) => `<li class="${states[i] || ''}"><b>${r.q}</b><small>${r.tier}</small></li>`).join('')}</ol>`;
-}
 function renderVideo() {
-  const st = S.video.state, p = $('#vPanel');
-  $('#player').dataset.state = st;
-  if (st === 'running') return; // runVideo draws the live panel
-  $('#vRate').textContent = ''; $('#vBuf').style.width = '0%'; $('#vPos').style.width = '0%';
+  const o = $('#videoOverlay'); const st = S.video.state;
+  $('#videoStatus').hidden = st !== 'running';
+  if (st === 'running') { o.innerHTML = '<button class="text-btn" data-act="vcancel" style="position:absolute;top:10px;left:12px">✕ Cancel</button>'; o.style.background = 'none'; return; }
+  o.style.background = '';
   if (st === 'done' && S.video.result) {
-    const v = S.video.result.video, rungs = net.LADDER.map((r) => v.rungs.find((x) => x.q === r.q));
-    const best = net.LADDER.find((r) => r.q === v.best);
-    if (best) setBadge(best); else setBadge(net.LADDER[0]);
-    $('#vBuf').style.width = '100%'; $('#vPos').style.width = '100%';
-    const peak = Math.max(0, ...v.rungs.map((r) => r.measured || 0));
-    p.innerHTML = `<div class="vhero"><span class="eyebrow">${best ? 'Smooth streaming up to' : 'Buffers even at'}</span>
-        <div class="vbest">${best ? best.q : '360p'}<small>${best ? best.tier : 'SD'}</small></div></div>
-      <div class="vstats">
-        <div><b>${v.startup ? (v.startup / 1000).toFixed(1) : '–'}<small> s</small></b><span>Start time</span></div>
-        <div><b>${peak ? fmtRate(peak) : '–'}<small> Mbps</small></b><span>Stream speed</span></div>
-        <div><b>${fmtBytes(v.bytes)}</b><span>Data used</span></div>
-      </div>
-      <div class="vrows">${net.LADDER.map((r, i) => { const x = rungs[i];
-        const cls = !x ? 'skip' : x.ok ? 'ok' : 'no';
-        const head = x && x.measured ? Math.min(1, x.measured / (r.mbps * 4)) : 0;
-        return `<div class="vrow ${cls}"><span class="q"><b>${r.q}</b><small>${r.tier}</small></span>
-          <span class="meter" title="Needs ${r.mbps} Mbps"><i style="width:${(head * 100).toFixed(0)}%"></i><em></em></span>
-          <span class="need">${x && x.measured ? `<b>${fmtRate(x.measured)}</b> Mbps · ` : ''}needs ${r.mbps}</span>
-          <span class="tag">${!x ? 'Not tried' : x.ok ? 'Smooth' : 'Buffers'}</span></div>`; }).join('')}</div>
-      <button class="pill-btn" data-act="video">${ICON.play}Test again</button>`;
+    const v = S.video.result.video;
+    o.innerHTML = `<p style="text-transform:uppercase;letter-spacing:.12em;font-size:12px">Smooth streaming up to</p>
+      <div class="best">${esc(v.best)}</div>
+      <p>Video starts in about <b>${v.startup ? (v.startup / 1000).toFixed(1) : '–'} s</b>. Used ${fmtBytes(v.bytes)}.</p>
+      <div class="ladder">${v.rungs.map((r) => `<div class="rung"><b>${r.q}</b><span class="st">${r.mbps} Mbps stream · loads in ${r.startup ? (r.startup / 1000).toFixed(2) + ' s' : '–'}</span><span class="${r.ok ? 'ok' : 'no'}">${r.ok ? '✓ Smooth' : '✕ Buffers'}</span></div>`).join('')}</div>
+      <button class="play" data-act="video" aria-label="Test again" style="width:84px">${ICON.play}</button>`;
     return;
   }
-  setBadge(net.LADDER[3]);
-  p.innerHTML = `<div class="vhero"><h2>Video test</h2><p>Streams 360p to 4K and finds the best quality that plays without buffering.</p></div>
-    ${ladderChips([])}<p class="fine">Uses up to 40 MB of data.</p>`;
+  o.innerHTML = `<h2>Video test</h2><p>Plays video at every quality from 360p to 4K, the way Netflix or YouTube would, and shows which ones stream without buffering.</p>
+    <button class="play" data-act="video" aria-label="Start video test">${ICON.play}</button>
+    <p style="font-size:13px;color:var(--muted)">Uses about 30–60 MB of data.</p>`;
 }
 async function runVideo() {
   if (S.running) return;
   S.running = true; S.abort = new AbortController(); S.video.state = 'running'; renderVideo();
+  swirl.set(0.25);
   let wake; try { wake = await navigator.wakeLock?.request('screen'); } catch {}
-  const total = net.LADDER.length, states = []; let idx = 0, stallTimer = 0, rungStart = 0;
-  const panel = (line) => { $('#vPanel').innerHTML = `${ladderChips(states)}<p class="vline" aria-live="polite">${line}</p><button class="text-btn" data-act="vcancel">Cancel</button>`; };
-  const stall = (on) => { player.stall(on); $('#player').classList.toggle('stalled', on); };
+  const total = net.LADDER.length; let idx = 0;
   try {
-    setBadge(net.LADDER[0]); states[0] = 'now'; panel('Starting stream…');
+    $('#vText').textContent = 'Testing adaptive bitrate…'; $('#vprog').style.width = '2%';
+    await sleep(900);
     const v = await net.videoTest({
       signal: S.abort.signal,
-      onStep: ({ rung, phase, s, ms, deadline, throughput, res }) => {
-        if (phase === 'start') { idx = net.LADDER.indexOf(rung); states[idx] = 'now'; setBadge(rung); rungStart = performance.now(); panel(`Playing ${rung.q} ${rung.tier} · ${rung.mbps} Mbps stream`); }
-        if (phase === 'segstart') { clearTimeout(stallTimer); stallTimer = setTimeout(() => stall(true), deadline); }
-        if (phase === 'segment') {
-          clearTimeout(stallTimer); stall(false);
-          if (throughput) $('#vRate').textContent = `${fmtRate(throughput)} Mbps`;
-          if (ms > deadline) panel(`Buffering at ${rung.q}…`);
-        }
-        const done = idx + (phase === 'done' ? 1 : phase === 'segment' ? (s + 1) / 4 : 0);
-        $('#vBuf').style.width = ((done / total) * 100).toFixed(1) + '%';
-        $('#vPos').style.width = ((Math.max(0, done - 0.35) / total) * 100).toFixed(1) + '%';
-        if (phase === 'done') states[idx] = res.ok ? 'ok' : 'no';
+      onStep: ({ rung, phase, throughput }) => {
+        if (phase === 'start') { idx = net.LADDER.indexOf(rung); $('#vText').textContent = `Testing ${rung.q}…`; }
+        if (phase === 'segment' && throughput) swirl.set(Math.min(1, 0.2 + Math.log10(1 + throughput) / 3));
+        $('#vprog').style.width = (((idx + (phase === 'done' ? 1 : 0.5)) / total) * 100).toFixed(0) + '%';
       },
-      // Hold each quality on screen briefly so the step-up is visible on fast lines.
-      pace: async () => { const left = 900 - (performance.now() - rungStart); if (left > 0) await sleep(left); },
     });
     const r = { id: uid(), ts: Date.now(), type: 'video', video: v, isp: S.settings.ispName || S.info?.isp, conn: conn(), room: S.settings.room || null };
     await results.put(r); S.results.push(r);
     S.video = { state: 'done', result: r };
+    swirl.burst();
   } catch (e) {
     S.video.state = S.video.result ? 'done' : 'idle';
     toast(e.name === 'AbortError' ? 'Video test cancelled' : "Couldn't reach the test server. Check that you're online.");
   } finally {
-    clearTimeout(stallTimer); stall(false);
-    S.running = false; S.abort = null;
+    S.running = false; S.abort = null; swirl.set(0.35);
     try { wake && wake.release(); } catch {}
     renderVideo();
   }
