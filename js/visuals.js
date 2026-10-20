@@ -132,6 +132,39 @@ export function createSwirl(canvas) {
   };
 }
 
+// ---------- Display refresh rate ----------
+// Times requestAnimationFrame. lock() takes the median interval of the frames so
+// far as the refresh period, snapped to a common panel rate, so a few janky frames
+// can't skew it. Call it after a quiet window: under heavy rendering, frames land
+// on multiples of the period and the median reads the render rate, not the panel.
+// From then on, intervals well past one period count as dropped frames.
+// Nothing is drawn, so it's fine under prefers-reduced-motion.
+const RATES = [24, 30, 48, 50, 60, 72, 75, 90, 100, 120, 144, 165, 180, 240, 360];
+export function createFrameMeter() {
+  let gaps = [], raf = 0, last = 0, hz = 0, raw = 0;
+  const tick = (t) => { if (last && !document.hidden) gaps.push(t - last); last = t; raf = requestAnimationFrame(tick); };
+  const resync = () => { last = 0; }; // a hidden tab pauses rAF: that's not a dropped frame
+  const clean = () => gaps.filter((x) => x > 1 && x < 500); // duplicate stamps and long stalls (tab switch, sleep)
+  function lock() {
+    const g = clean(); gaps = [];
+    if (g.length < 20) return 0;
+    raw = 1000 / [...g].sort((a, b) => a - b)[g.length >> 1];
+    const near = RATES.reduce((a, b) => (Math.abs(b - raw) < Math.abs(a - raw) ? b : a));
+    return (hz = Math.abs(near - raw) / near < 0.06 ? near : Math.round(raw));
+  }
+  return {
+    start() { if (raf) return; gaps = []; last = 0; hz = 0; document.addEventListener('visibilitychange', resync); raf = requestAnimationFrame(tick); },
+    lock,
+    clear() { gaps = []; },
+    stop() {
+      cancelAnimationFrame(raf); raf = 0; document.removeEventListener('visibilitychange', resync);
+      const g = clean(); if (!hz && !lock()) return null;
+      const period = 1000 / hz, dropped = g.reduce((n, x) => n + Math.max(0, Math.round(x / period) - 1), 0), frames = g.length + dropped;
+      return { hz, raw: +raw.toFixed(1), frames, dropped, smooth: frames > 0 && dropped / frames < 0.02 };
+    },
+  };
+}
+
 // ---------- Speed dial ----------
 const STOPS = [0, 5, 10, 50, 100, 250, 500, 750, 1000];
 const A0 = Math.PI * 0.75, SWEEP = Math.PI * 1.5;
