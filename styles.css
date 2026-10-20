@@ -108,8 +108,6 @@ main { flex: 1; min-height: 0; position: relative; overflow: hidden; }
 .go:hover { border-color: var(--down); }
 .go:active { transform: scale(0.98); }
 @keyframes breathe { 50% { opacity: 0.08; transform: scale(1.05); } }
-.hint { color: var(--muted); margin: 0; font-size: 14px; text-align: center; min-height: 1.5em; }
-.hint b { color: var(--fg); }
 
 .speed-stage:has(#metrics:not([hidden])) { justify-content: flex-start; padding-top: 0; }
 .metrics { position: sticky; top: 0; z-index: 3; background: var(--bg); width: 100%; max-width: 520px; padding: 10px 0 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; border-bottom: 1px solid var(--line); }

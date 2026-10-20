@@ -52,7 +52,6 @@ async function boot() {
   player = createPlayer($('#film'), $('#ambient'));
   wire();
   renderInfo();
-  renderIdleHint();
   const hashTab = (location.hash || '').slice(1);
   show(['speed', 'video', 'status', 'map', 'history'].includes(hashTab) ? hashTab : 'speed');
   loadInfo();
@@ -102,11 +101,6 @@ function renderInfo() {
   $('#connChip').innerHTML = `${label}${S.settings.connMode === 'auto' ? ' (auto)' : ''} ▾`;
   const where = S.info?.colo ? `Server ${S.info.colo}` : S.info?.city ? `Near ${S.info.city}` : 'Cloudflare';
   $('#serverChip').textContent = where;
-}
-
-function renderIdleHint() {
-  const last = [...S.results].reverse().find((r) => r.type === 'speed');
-  $('#lastHint').innerHTML = last ? `Last test ${ago(last.ts)}: <b>${fmt(last.down)}</b> ↓ / <b>${fmt(last.up)}</b> ↑ Mbps` : '';
 }
 
 // ---------- navigation ----------
@@ -208,7 +202,6 @@ async function maybeLocation() {
 }
 
 function afterResult(r) {
-  renderIdleHint();
   if (S.settings.badge && navigator.setAppBadge) navigator.setAppBadge(Math.round(r.down)).catch(() => {});
   const plan = S.settings.planDown;
   if (plan && r.down < plan * 0.5 && r.conn !== 'cellular') {
@@ -678,7 +671,7 @@ function openResult(id) {
   openSheet(dateFmt.format(r.ts), body + `<button class="btn danger" id="delRes">Delete this result</button>`, (b) => {
     $('#delRes', b).addEventListener('click', async (ev) => {
       const btn = ev.currentTarget; if (!btn.dataset.sure) { btn.dataset.sure = 1; btn.textContent = 'Tap again to delete'; return; }
-      await results.del(id); S.results = S.results.filter((x) => x.id !== id); closeSheet(); renderHistory(); renderIdleHint();
+      await results.del(id); S.results = S.results.filter((x) => x.id !== id); closeSheet(); renderHistory();
     });
   });
 }
@@ -778,7 +771,7 @@ function openSettings() {
     $('#setCsv', b).addEventListener('click', exportCSV);
     $('#wipe', b).addEventListener('click', async (e) => {
       const btn = e.currentTarget; if (!btn.dataset.sure) { btn.dataset.sure = 1; btn.textContent = 'Tap again to delete everything'; return; }
-      await results.clear(); await outages.clear(); S.results = []; S.outages = []; renderIdleHint(); closeSheet(); toast('All results deleted');
+      await results.clear(); await outages.clear(); S.results = []; S.outages = []; closeSheet(); toast('All results deleted');
     });
     $('#saveSettings', b).addEventListener('click', async () => {
       Object.assign(S.settings, { planDown: num('#planDown'), planUp: num('#planUp'), monthlyCost: num('#cost'), ispName: $('#ispName', b).value.trim(), duration: +$('#duration', b).value, saveLocation: $('#saveLoc', b).checked, badge: $('#badge', b).checked });
