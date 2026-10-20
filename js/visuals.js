@@ -269,3 +269,164 @@ export function sparkline(canvas, values, color) {
   values.forEach((v, i) => { const x = (W * i) / (values.length - 1), y = H - 2 - (H - 4) * (v / max); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
   ctx.stroke();
 }
+
+// ---------- Runner (idle Speed tab) ----------
+// A side-view runner posed every frame from running-gait joint angles: hip,
+// knee and ankle curves for each leg, counter-swinging arms with bent elbows,
+// a forward lean, the dip at mid-stance and a short flight phase. The stance
+// foot stays planted while the ground scrolls under it at the same speed.
+export function createRunner(svg) {
+  const NS = 'http://www.w3.org/2000/svg';
+  const CYCLE = 0.72;                        // seconds per stride (two steps), ~167 steps/min
+  const GROUND = 104, HIP_X = 57, LEAN = 9;  // lean in degrees, top tilted forward
+  const L = { thigh: 19.5, shin: 19, torso: 22.5, neck: 3.2, upper: 13.5, fore: 12 };
+  const STANCE = 0.38;                       // fraction of the cycle a foot is on the ground
+
+  // Joint angle keyframes over one cycle for one leg (0 = foot strike).
+  // Hip: thigh angle from vertical, + forward. Knee: flexion. Ankle: + toes up.
+  const HIP = [[0, 27], [0.1, 17], [0.2, 4], [0.3, -10], [0.38, -18], [0.48, -12], [0.6, 6], [0.72, 28], [0.84, 40], [0.93, 36]];
+  const KNEE = [[0, 16], [0.1, 32], [0.17, 38], [0.28, 28], [0.38, 18], [0.48, 52], [0.6, 98], [0.7, 112], [0.8, 88], [0.9, 40]];
+  const ANKLE = [[0, 4], [0.1, 14], [0.2, 18], [0.3, 4], [0.38, -24], [0.5, -14], [0.65, -2], [0.85, 6]];
+  const SHOULDER = [[0, -32], [0.25, 6], [0.5, 34], [0.75, 4]]; // near arm, in phase with the far leg
+  const ELBOW = [[0, 78], [0.25, 92], [0.5, 106], [0.75, 90]];
+
+  // Periodic Catmull-Rom through keyframes, so every curve is smooth and loops.
+  const curve = (keys) => (p) => {
+    p = ((p % 1) + 1) % 1;
+    const n = keys.length;
+    let i = n - 1; while (i > 0 && keys[i][0] > p) i--;
+    const k = (j) => { const m = ((j % n) + n) % n; return [keys[m][0] + Math.floor(j / n), keys[m][1]]; };
+    const [t1, v1] = k(i), [t2, v2] = k(i + 1), [, v0] = k(i - 1), [, v3] = k(i + 2);
+    const s = (p - t1) / (t2 - t1), s2 = s * s, s3 = s2 * s;
+    return 0.5 * (2 * v1 + (-v0 + v2) * s + (2 * v0 - 5 * v1 + 4 * v2 - v3) * s2 + (-v0 + 3 * v1 - 3 * v2 + v3) * s3);
+  };
+  const hip = curve(HIP), knee = curve(KNEE), ankle = curve(ANKLE), shoulder = curve(SHOULDER), elbow = curve(ELBOW);
+  const rad = (d) => d * Math.PI / 180;
+  const along = (o, deg, len) => [o[0] + Math.sin(rad(deg)) * len, o[1] + Math.cos(rad(deg)) * len]; // deg from straight down, + forward
+  const rot = (o, deg, [x, y]) => { const a = rad(deg), c = Math.cos(a), s = Math.sin(a); return [o[0] + x * c - y * s, o[1] + x * s + y * c]; };
+
+  // Smooth closed outline through points (Catmull-Rom as cubic Béziers).
+  const f = (v) => v.toFixed(2);
+  function outline(pts) {
+    const n = pts.length; let d = `M${f(pts[0][0])} ${f(pts[0][1])}`;
+    for (let i = 0; i < n; i++) {
+      const p0 = pts[(i - 1 + n) % n], p1 = pts[i], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
+      d += `C${f(p1[0] + (p2[0] - p0[0]) / 6)} ${f(p1[1] + (p2[1] - p0[1]) / 6)} ${f(p2[0] - (p3[0] - p1[0]) / 6)} ${f(p2[1] - (p3[1] - p1[1]) / 6)} ${f(p2[0])} ${f(p2[1])}`;
+    }
+    return d + 'Z';
+  }
+  // A body segment from a to b: stations [t, front width, back width] along it, rounded ends.
+  function limb(a, b, stations) {
+    const dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy) || 1;
+    const u = [dx / len, dy / len], n = [u[1], -u[0]]; // n points to the body's front when the segment hangs down
+    const at = (t, w) => [a[0] + dx * t + n[0] * w, a[1] + dy * t + n[1] * w];
+    const first = stations[0], last = stations[stations.length - 1];
+    const cap = (o, w, dir) => [o[0] + u[0] * w * dir, o[1] + u[1] * w * dir];
+    const front = stations.map(([t, w]) => at(t, w));
+    const back = stations.map(([t, , w]) => at(t, -w)).reverse();
+    const endR = (last[1] + last[2]) / 2, startR = (first[1] + first[2]) / 2;
+    return outline([...front, cap(at(last[0], (last[1] - last[2]) / 2), endR, 1), ...back, cap(at(first[0], (first[1] - first[2]) / 2), startR, -1)]);
+  }
+
+  const el = (tag, cls, parent) => { const e = document.createElementNS(NS, tag); if (cls) e.setAttribute('class', cls); parent.appendChild(e); return e; };
+  svg.textContent = '';
+  const shadow = el('ellipse', 'shadow', svg);
+  shadow.setAttribute('cx', HIP_X + 2); shadow.setAttribute('cy', GROUND + 0.8); shadow.setAttribute('ry', 1.8);
+  const ground = el('path', 'ground', svg); ground.setAttribute('d', `M8 ${GROUND + 0.5}H112`);
+  const body = el('g', 'body', svg);
+  const part = (g, cls) => el('path', cls, g);
+  const makeArm = (g) => ({ upper: part(g, 'skin'), fore: part(g, 'skin'), hand: part(g, 'skin'), sleeve: part(g, 'shirt') });
+  const makeLeg = (g) => ({ thigh: part(g, 'skin'), shin: part(g, 'skin'), sock: part(g, 'sock'), shoe: part(g, 'shoe'), sole: part(g, 'sole'), short: part(g, 'shorts') });
+  const farG = el('g', 'far', body);
+  const farArm = makeArm(farG), farLeg = makeLeg(farG);
+  const torso = part(body, 'shirt'), pelvis = part(body, 'shorts');
+  const nearLeg = makeLeg(el('g', 'near', body));
+  const neck = part(body, 'skin'), head = part(body, 'skin'), hair = part(body, 'hair'), ear = part(body, 'ear');
+  const nearArm = makeArm(el('g', 'near', body));
+
+  // Leg pose with the hip at the origin; the foot is drawn in its own frame
+  // (x toward the toes, y toward the sole) with the ankle at the origin.
+  const SHOE = [[-3.4, -1.6], [-4.0, 0.6], [-3.4, 3.0], [1, 3.3], [6.4, 3.2], [8.2, 2.4], [7.6, 1.1], [4.6, 0.1], [1.6, -1.4], [0.8, -2.6], [-2.2, -2.5]];
+  function legPose(p, o) {
+    const th = hip(p), sh = th - knee(p), foot = -sh - ankle(p); // foot: SVG rotation of the foot frame
+    const k = along(o, th, L.thigh), a = along(k, sh, L.shin);
+    return { o, k, a, foot, toe: rot(a, foot, [8.2, 3.2]), heel: rot(a, foot, [-3.6, 3.2]) };
+  }
+  // How far below the hip the lowest point of each foot sits, sampled over a cycle.
+  const lowest = (p) => { const g = legPose(p, [0, 0]); return Math.max(g.toe[1], g.heel[1]); };
+
+  // Hip height: the stance foot's sole rests on the ground; between stances the
+  // body floats on a short arc. Ground speed matches the planted foot.
+  const N = 240, hipY = new Float32Array(N);
+  const stanceDepth = (p) => { const q = ((p % 0.5) + 0.5) % 0.5; return q <= STANCE ? lowest(q) : NaN; };
+  for (let i = 0; i < N; i++) hipY[i] = GROUND - stanceDepth(i / N);
+  for (const start of [STANCE, 0.5 + STANCE]) { // fill the two flight phases
+    const i0 = Math.round(start * N), i1 = Math.round((start - STANCE + 0.5) * N) % N;
+    const y0 = hipY[i0 - 1], y1 = hipY[i1], span = (i1 - i0 + N) % N;
+    for (let j = 0; j < span; j++) { const s = j / span; hipY[(i0 + j) % N] = y0 + (y1 - y0) * s - 2.2 * Math.sin(Math.PI * s); }
+  }
+  const footX = (p) => legPose(p, [0, 0]).a[0];
+  const speed = (footX(0.02) - footX(STANCE - 0.02)) / ((STANCE - 0.04) * CYCLE); // units per second
+  const LOW = Math.max(...hipY);
+  const hipAt = (p) => { const x = ((p % 1) + 1) % 1 * N, i = Math.floor(x), s = x - i; return hipY[i % N] * (1 - s) + hipY[(i + 1) % N] * s; };
+
+  function drawLeg(parts, g) {
+    parts.thigh.setAttribute('d', limb(g.o, g.k, [[0, 4.3, 4.7], [0.45, 3.9, 3.7], [1, 2.6, 2.7]]));
+    parts.short.setAttribute('d', limb(g.o, along(g.o, Math.atan2(g.k[0] - g.o[0], g.k[1] - g.o[1]) * 180 / Math.PI, L.thigh * 0.36), [[0, 4.6, 5.0], [1, 4.25, 4.15]]));
+    parts.shin.setAttribute('d', limb(g.k, g.a, [[0, 2.6, 2.6], [0.3, 2.3, 3.4], [0.72, 1.6, 1.8], [1, 1.4, 1.6]]));
+    const sockTop = [g.k[0] + (g.a[0] - g.k[0]) * 0.8, g.k[1] + (g.a[1] - g.k[1]) * 0.8];
+    parts.sock.setAttribute('d', limb(sockTop, g.a, [[0, 1.75, 1.95], [1, 1.6, 1.75]]));
+    parts.shoe.setAttribute('d', outline(SHOE.map((pt) => rot(g.a, g.foot, pt))));
+    parts.sole.setAttribute('d', outline([[-3.6, 2.4], [1, 2.7], [6.6, 2.6], [8.1, 2.3], [7.9, 3.1], [6.4, 3.6], [1, 3.7], [-3.3, 3.4]].map((pt) => rot(g.a, g.foot, pt))));
+  }
+  function drawArm(parts, s, sh, el) {
+    const e = along(s, sh, L.upper), fa = sh + el, w = along(e, fa, L.fore), h = along(w, fa + 12, 2.6);
+    parts.upper.setAttribute('d', limb(s, e, [[0, 2.7, 2.9], [0.5, 2.2, 2.4], [1, 1.75, 1.85]]));
+    parts.sleeve.setAttribute('d', limb(s, along(s, sh, L.upper * 0.42), [[0, 3.4, 3.5], [1, 2.9, 2.9]]));
+    parts.fore.setAttribute('d', limb(e, w, [[0, 1.8, 1.9], [0.35, 1.9, 2.1], [1, 1.25, 1.3]]));
+    parts.hand.setAttribute('d', limb(w, h, [[0, 1.55, 1.5], [0.6, 2.0, 1.9], [1, 1.6, 1.5]]));
+  }
+
+  function pose(p) {
+    p = ((p % 1) + 1) % 1;
+    const y = hipAt(p), o = [HIP_X, y];
+    const lean = LEAN + 1.5 * Math.cos(4 * Math.PI * (p - 0.12)); // trunk dips forward slightly each step
+    const top = along(o, 180 - lean, L.torso), base = along(o, -lean, 2.5);
+    const sh = along(o, 180 - lean, L.torso - 2.6); // shoulder joint, a little below the top of the torso
+
+    torso.setAttribute('d', limb(base, top, [[0, 4.8, 5.4], [0.35, 4.3, 4.0], [0.72, 5.6, 4.2], [0.92, 4.4, 4.4], [1, 3.4, 3.8]]));
+    pelvis.setAttribute('d', limb(base, along(o, 180 - lean, 6), [[0, 4.6, 5.0], [1, 4.4, 4.1]]));
+    drawLeg(farLeg, legPose(p + 0.5, o));
+    drawLeg(nearLeg, legPose(p, o));
+
+    const nb = along(top, 180 - lean - 6, 0.8), nt = along(nb, 180 - lean - 10, L.neck + 1.2);
+    neck.setAttribute('d', limb(nb, nt, [[0, 2.2, 2.4], [1, 1.9, 2.0]]));
+    // Head in its own frame: origin at the top of the neck, x forward, y down, tilted with the trunk.
+    const tilt = -(lean - 4), H = (pts) => pts.map((pt) => rot(nt, tilt, pt));
+    head.setAttribute('d', outline(H([[-4.4, -4.6], [-3.6, -8.4], [0, -10.4], [3.6, -9.2], [4.6, -6.6], [4.9, -5.2], [6.0, -3.6], [4.9, -3.0], [5.0, -2.0], [4.2, -0.6], [2.4, 0.2], [0.4, -0.2], [-2.2, -0.6], [-4.3, -2.2]])));
+    hair.setAttribute('d', outline(H([[-4.9, -3.4], [-4.8, -6.6], [-2.6, -9.9], [0.6, -11.0], [3.6, -9.8], [4.7, -7.6], [3.4, -8.0], [1.0, -7.6], [-0.4, -6.4], [-1.6, -4.4], [-3.0, -2.6]])));
+    ear.setAttribute('d', outline(H([[-1.2, -5.6], [0.2, -5.4], [0.4, -3.6], [-0.6, -2.6], [-1.4, -3.6]])));
+
+    drawArm(farArm, along(sh, 90 - lean, -0.6), shoulder(p + 0.5), elbow(p + 0.5));
+    drawArm(nearArm, along(sh, 90 - lean, 0.6), shoulder(p), elbow(p));
+
+    const lift = Math.min(6, Math.max(0, LOW - y)); // shadow shrinks as the body rises
+    shadow.setAttribute('rx', f(15 - lift * 0.6));
+  }
+
+  let raf = 0, t0 = 0;
+  function frame(now) {
+    raf = requestAnimationFrame(frame);
+    if (!svg.isConnected || !svg.getClientRects().length) return; // idle view hidden: skip the work
+    if (!t0) t0 = now;
+    const t = (now - t0) / 1000;
+    pose(t / CYCLE);
+    ground.style.strokeDashoffset = f((t * speed) % 16);
+  }
+  function start() { if (raf) return; if (reduceMotion()) { pose(0.43); return; } t0 = 0; raf = requestAnimationFrame(frame); }
+  function stop() { cancelAnimationFrame(raf); raf = 0; }
+  document.addEventListener('visibilitychange', () => (document.hidden ? stop() : start()));
+  pose(0.43);
+  start();
+  return { start, stop };
+}

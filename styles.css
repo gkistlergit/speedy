@@ -76,35 +76,23 @@ main { flex: 1; min-height: 0; position: relative; overflow: hidden; }
 .go-label { font: 500 17px/1 var(--ui); letter-spacing: 0.02em; color: var(--on-accent); background: var(--accent); padding: 8px 22px 9px; border-radius: 999px; box-shadow: var(--shadow); transition: background 0.2s; }
 .go:hover .go-label { background: var(--down); }
 .go::after { content: ''; position: absolute; inset: -14px; border-radius: 50%; z-index: -1; border: 1px solid var(--down); opacity: 0.35; animation: breathe 3.6s ease-in-out infinite; }
-/* runner: an original kid ballplayer running in side view */
-.runner { width: 68%; height: auto; aspect-ratio: 1; margin: -10% 0 -8%; overflow: visible; --jersey: #e6d6bb; --cap: #3e4a3d; --skin: #d6a47a; --pants: #efe7da; --sock: #b07a55; --ink: #2a2722; --shoe: #2a2722; }
-@media (prefers-color-scheme: dark) { .runner { --cap: #7d9472; --ink: #0d0b09; --shoe: #a07a5c; --pants: #e2d8c8; } }
-.runner * { transform-box: view-box; }
-.runner .ground { stroke: var(--line-strong); stroke-width: 2; stroke-linecap: round; stroke-dasharray: 7 9; animation: ground 0.45s linear infinite; }
-.runner .speedlines path { stroke: var(--dim); stroke-width: 2; stroke-linecap: round; fill: none; animation: whoosh 0.9s ease-in-out infinite; }
-.runner .body { animation: bob 0.45s ease-in-out infinite; }
-.runner .lean { transform: rotate(9deg); transform-origin: 60px 74px; }
-.runner .jersey { fill: var(--jersey); stroke: var(--ink); stroke-width: 1.6; }
-.runner .stripe { stroke: var(--sock); stroke-width: 2.4; }
-.runner .head { fill: var(--skin); stroke: var(--ink); stroke-width: 1.6; }
-.runner .cap, .runner .brim { fill: var(--cap); stroke: var(--ink); stroke-width: 1.2; stroke-linejoin: round; }
-.runner .thigh { stroke: var(--pants); stroke-width: 7.5; stroke-linecap: round; }
-.runner .sock { stroke: var(--sock); stroke-width: 5.5; stroke-linecap: round; }
+/* runner: a side-view runner, posed each frame from running-gait joint angles (js/visuals.js) */
+.runner { width: 68%; height: auto; aspect-ratio: 1; margin: -10% 0 -8%; overflow: visible;
+  --skin: #b9805a; --skin-far: #9c6a49; --hair: #2a2722; --shirt: #6f8466; --shirt-far: #5b6d53; --shorts: #2f3a2f; --sock: #f3efe8; --shoe: #b07a55; --sole: #e9e3d8; }
+@media (prefers-color-scheme: dark) { .runner { --skin: #c99470; --skin-far: #a2765a; --hair: #0d0b09; --shirt: #9db08f; --shirt-far: #7f9273; --shorts: #4a5745; --sock: #e2d8c8; --shoe: #d39b74; --sole: #ede6da; } }
+.runner .ground { fill: none; stroke: var(--line-strong); stroke-width: 1.6; stroke-linecap: round; stroke-dasharray: 7 9; }
+.runner .shadow { fill: var(--fg); opacity: 0.08; }
+.runner .skin { fill: var(--skin); }
+.runner .ear { fill: var(--skin-far); }
+.runner .hair { fill: var(--hair); }
+.runner .shirt { fill: var(--shirt); }
+.runner .shorts { fill: var(--shorts); }
+.runner .sock { fill: var(--sock); }
 .runner .shoe { fill: var(--shoe); }
-.runner .upper { stroke: var(--jersey); stroke-width: 6; stroke-linecap: round; }
-.runner .fore path { stroke: var(--skin); stroke-width: 4.6; stroke-linecap: round; }
-.runner .leg-back, .runner .arm-back { filter: brightness(0.82); }
-.runner .leg { transform-origin: 60px 74px; animation: thigh 0.45s linear infinite; }
-.runner .shin { transform-origin: 60px 88px; animation: shin 0.45s linear infinite; }
-.runner .arm { transform-origin: 60px 52px; animation: arm 0.45s ease-in-out infinite; }
-.runner .fore { transform-origin: 60px 63px; transform: rotate(-80deg); }
-.runner .leg-back, .runner .leg-back .shin, .runner .arm-front { animation-delay: -0.225s; }
-@keyframes thigh { 0% { transform: rotate(-38deg); } 50% { transform: rotate(36deg); } 100% { transform: rotate(-38deg); } }
-@keyframes shin { 0% { transform: rotate(12deg); } 30% { transform: rotate(18deg); } 55% { transform: rotate(40deg); } 75% { transform: rotate(105deg); } 100% { transform: rotate(12deg); } }
-@keyframes arm { 0% { transform: rotate(48deg); } 50% { transform: rotate(-52deg); } 100% { transform: rotate(48deg); } }
-@keyframes bob { 0%, 50%, 100% { transform: translateY(0); } 25%, 75% { transform: translateY(-3px); } }
-@keyframes ground { to { stroke-dashoffset: 16; } }
-@keyframes whoosh { 0%, 100% { opacity: 0.25; transform: translateX(4px); } 50% { opacity: 0.8; transform: translateX(-4px); } }
+.runner .sole { fill: var(--sole); }
+.runner .far .skin { fill: var(--skin-far); }
+.runner .far .shirt { fill: var(--shirt-far); }
+.runner .far { filter: brightness(0.9); }
 .go:hover { border-color: var(--down); }
 .go:active { transform: scale(0.98); }
 @keyframes breathe { 50% { opacity: 0.08; transform: scale(1.05); } }
@@ -332,6 +320,6 @@ main { flex: 1; min-height: 0; position: relative; overflow: hidden; }
   .info-sheet { max-width: 640px; margin: 0 auto; width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .go::after, .pulse, .runner *, .runner .body { animation: none !important; }
+  .go::after, .pulse { animation: none !important; }
   .sheet { animation: none; }
 }
