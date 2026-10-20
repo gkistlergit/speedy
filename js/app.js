@@ -44,7 +44,7 @@ let gauge, swirl;
 
 // ---------- boot ----------
 async function boot() {
-  createRunner($('.runner'));
+  createRunner($('.runner'), $('.speed-stage'));
   S.settings = await loadSettings();
   S.results = ((await results.all()) || []).sort((a, b) => a.ts - b.ts);
   S.outages = ((await outages.all()) || []).sort((a, b) => a.start - b.start);
@@ -628,7 +628,7 @@ function renderHistory() {
     </div><p>${median(w.map((r) => r.down)) >= median(c.map((r) => r.down)) ? 'Wi-Fi is faster here.' : 'Cellular is beating your Wi-Fi. Worth checking your router or where you sit.'}</p></div>` : '';
   const list = [...rs].reverse().slice(0, 100);
   body.innerHTML = chips + `<div class="stack">
-    <div class="stat-grid"><div class="stat"><span>Typical ↓</span><b style="color:var(--down)">${fmt(md)}</b><span>Mbps</span></div>
+    <div class="stat-grid"><div class="stat"><span>Typical ↓</span><b style="color:var(--down-ink)">${fmt(md)}</b><span>Mbps</span></div>
       <div class="stat"><span>Typical ↑</span><b style="color:var(--up)">${fmt(mu)}</b><span>Mbps</span></div>
       <div class="stat"><span>Typical ping</span><b>${fmtMs(mp)}</b><span>ms</span></div></div>
     ${plan ? `<div class="card"><h4>Getting what you pay for?</h4><b class="big">${Math.round(planPct * 100)}% of tests hit 80%+ of your ${plan} Mbps plan</b>
@@ -663,7 +663,7 @@ function openResult(id) {
     : `<div class="kv"><span>Download</span><span>${fmt(r.down)} Mbps</span><span>Upload</span><span>${fmt(r.up)} Mbps</span><span>Ping (idle)</span><span>${fmtMs(r.ping)} ms</span>
       <span>Ping while downloading</span><span>${fmtMs(r.loadedDown)} ms</span><span>Ping while uploading</span><span>${fmtMs(r.loadedUp)} ms</span><span>Lag-when-busy grade</span><span>${esc(r.bloat || '–')}</span>
       <span>Jitter</span><span>${fmtMs(r.jitter)} ms</span><span>Provider</span><span>${esc(r.isp || '–')}</span><span>Connection</span><span>${r.conn === 'cellular' ? 'Cellular' : 'Wi-Fi'}</span>
-      ${roomName(r.room) ? `<span>Room</span><span>${esc(roomName(r.room))}</span>` : ''}${r.lat ? `<span>Location</span><span><a style="color:var(--down)" target="_blank" rel="noopener" href="https://maps.apple.com/?ll=${r.lat},${r.lon}&q=Speed%20test">${r.lat}, ${r.lon} ↗</a></span>` : ''}
+      ${roomName(r.room) ? `<span>Room</span><span>${esc(roomName(r.room))}</span>` : ''}${r.lat ? `<span>Location</span><span><a style="color:var(--down-ink)" target="_blank" rel="noopener" href="https://maps.apple.com/?ll=${r.lat},${r.lon}&q=Speed%20test">${r.lat}, ${r.lon} ↗</a></span>` : ''}
       <span>Data used</span><span>${fmtBytes(r.bytes || 0)}</span></div>`;
   openSheet(dateFmt.format(r.ts), body + `<button class="btn danger" id="delRes">Delete this result</button>`, (b) => {
     $('#delRes', b).addEventListener('click', async (ev) => {
