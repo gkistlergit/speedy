@@ -1,6 +1,6 @@
 // Speedy service worker: keeps the app itself available offline.
 // Speed tests and status checks always go straight to the network.
-const VERSION = 'speedy-v4';
+const VERSION = 'speedy-v5';
 const SHELL = ['./', 'index.html', 'styles.css', 'js/app.js', 'js/net.js', 'js/store.js', 'js/visuals.js', 'js/services.js',
   'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 
@@ -15,7 +15,7 @@ self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
   if (url.origin === location.origin) {
     // network first so updates arrive, cache as fallback for offline
-    e.respondWith(fetch(e.request).then((r) => {
+    e.respondWith(fetch(e.request, { cache: 'no-cache' }).then((r) => {
       if (r.ok) { const copy = r.clone(); caches.open(VERSION).then((c) => c.put(e.request, copy)); }
       return r;
     }).catch(() => caches.match(e.request, { ignoreSearch: true }).then((r) => r || caches.match('index.html'))));
