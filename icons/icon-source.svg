@@ -1,14 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024"><defs>
-  <linearGradient id="arc" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#9db08f"/><stop offset="1" stop-color="#d39b74"/></linearGradient>
+  <linearGradient id="arc" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#4d8dff"/><stop offset="1" stop-color="#a78bfa"/></linearGradient>
 </defs>
-<rect width="1024" height="1024" fill="#1c1a16"/>
+<rect width="1024" height="1024" fill="#0b0d12"/>
 <path d="M264.5 767.5A350 350 0 1 1 851.0 433.0" fill="none" stroke="url(#arc)" stroke-width="56" stroke-linecap="round"/>
-<g fill="none" stroke="#e6d6bb" stroke-width="58" stroke-linecap="round" stroke-linejoin="round">
+<g fill="none" stroke="#f2f4f7" stroke-width="58" stroke-linecap="round" stroke-linejoin="round">
   <path d="M548 432L500 586"/>
   <path d="M536 460L618 512L676 452"/>
   <path d="M536 460L448 486L404 560"/>
   <path d="M500 586L608 644L590 762"/>
   <path d="M500 586L440 690L334 700"/>
 </g>
-<circle cx="574" cy="340" r="56" fill="#e6d6bb"/>
+<circle cx="574" cy="340" r="56" fill="#f2f4f7"/>
 </svg>

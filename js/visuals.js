@@ -2,13 +2,13 @@ const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matche
 export const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#888888';
 
 // ---------- Particle swirl (video test backdrop) ----------
-// A slowly precessing vortex: three depth layers of comets spiral into a warm
+// A slowly precessing vortex: three depth layers of comets spiral into a bright
 // core, with tapered trails, bokeh in the foreground, nebula light, a breathing
 // core glow, vignette and film grain. Speed follows the test's throughput.
 export function createSwirl(canvas) {
   const ctx = canvas.getContext('2d');
-  const PALETTE = [[201, 183, 156], [176, 122, 85], [143, 163, 130], [216, 199, 168], [166, 94, 63], [230, 220, 200], [111, 132, 102], [196, 154, 58]];
-  const CORE = [255, 236, 206];
+  const PALETTE = [[77, 141, 255], [124, 58, 237], [56, 189, 248], [167, 139, 250], [37, 99, 235], [226, 232, 240], [99, 102, 241], [148, 163, 184]];
+  const CORE = [226, 236, 255];
   let W = 0, H = 0, R = 0, parts = [], bokeh = [], raf = 0, intensity = 0.35, target = 0.35, t = 0, flare = 0, last = 0;
   let vignette = null, grain = null;
   const smooth = (e0, e1, x) => { const k = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return k * k * (3 - 2 * k); };
@@ -40,7 +40,7 @@ export function createSwirl(canvas) {
     parts = Array.from({ length: n }, () => spawn(true));
     bokeh = Array.from({ length: 14 }, () => ({ r: R * (0.35 + Math.random() * 0.75), a: Math.random() * Math.PI * 2, w: 0.0006 + Math.random() * 0.0012, size: 14 + Math.random() * 34, c: PALETTE[(Math.random() * PALETTE.length) | 0] }));
     vignette = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.hypot(W, H) * 0.62);
-    vignette.addColorStop(0, 'rgba(10,8,6,0)'); vignette.addColorStop(1, 'rgba(10,8,6,0.78)');
+    vignette.addColorStop(0, 'rgba(6,8,12,0)'); vignette.addColorStop(1, 'rgba(6,8,12,0.78)');
     if (!grain) grain = makeGrain();
   }
   function frame(now) {
@@ -54,10 +54,10 @@ export function createSwirl(canvas) {
     const cr = Math.cos(rot), sr = Math.sin(rot);
     const proj = (a, r) => { const x = Math.cos(a) * r, y = Math.sin(a) * r * tilt; return [cx + x * cr - y * sr, cy + x * sr + y * cr]; };
 
-    // deep background, warm toward the core
+    // deep background, lighter toward the core
     ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
     const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
-    bg.addColorStop(0, '#2b231c'); bg.addColorStop(0.45, '#1d1915'); bg.addColorStop(1, '#100d0b');
+    bg.addColorStop(0, '#161c2b'); bg.addColorStop(0.45, '#0f131c'); bg.addColorStop(1, '#07090d');
     ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
 
     ctx.globalCompositeOperation = 'lighter';
@@ -87,7 +87,7 @@ export function createSwirl(canvas) {
       if (p.r < 4) { Object.assign(p, spawn(false)); continue; }
       const fade = smooth(4, R * 0.1, p.r) * smooth(R * 1.1, R * 0.85, p.r);
       if (fade < 0.01) continue;
-      const heat = 1 - smooth(0, R * 0.35, p.r); // warms to white near the core
+      const heat = 1 - smooth(0, R * 0.35, p.r); // brightens to white near the core
       const col = p.c.map((v, i) => Math.round(v + (CORE[i] - v) * heat * 0.8)).join(',');
       const [hx, hy] = proj(p.a, p.r);
       const [mx, my] = proj(p.a - da * trail * 0.5, p.r + dr * trail * 0.5);
@@ -99,7 +99,7 @@ export function createSwirl(canvas) {
       ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(hx, hy); ctx.stroke();
       if (p.spark) {
         const tw = 0.55 + 0.45 * Math.sin(t * 9 + p.tw);
-        ctx.fillStyle = `rgba(255,246,232,${(0.5 + p.z * 0.5) * tw * fade})`;
+        ctx.fillStyle = `rgba(240,245,255,${(0.5 + p.z * 0.5) * tw * fade})`;
         ctx.beginPath(); ctx.arc(hx, hy, 0.7 + p.z * 0.9, 0, Math.PI * 2); ctx.fill();
       }
     }
@@ -107,9 +107,9 @@ export function createSwirl(canvas) {
     // breathing core glow + flare
     const pulse = 0.85 + Math.sin(t * 3) * 0.15, core = R * (0.16 + intensity * 0.1 + flare * 0.25);
     const cg = ctx.createRadialGradient(cx, cy, 0, cx, cy, core);
-    cg.addColorStop(0, `rgba(255,236,206,${(0.22 + intensity * 0.3 + flare * 0.5) * pulse})`);
-    cg.addColorStop(0.35, `rgba(211,155,116,${(0.07 + intensity * 0.08 + flare * 0.2) * pulse})`);
-    cg.addColorStop(1, 'rgba(211,155,116,0)');
+    cg.addColorStop(0, `rgba(226,236,255,${(0.22 + intensity * 0.3 + flare * 0.5) * pulse})`);
+    cg.addColorStop(0.35, `rgba(99,102,241,${(0.07 + intensity * 0.08 + flare * 0.2) * pulse})`);
+    cg.addColorStop(1, 'rgba(99,102,241,0)');
     ctx.fillStyle = cg; ctx.fillRect(cx - core, cy - core, core * 2, core * 2);
 
     // cinematic finish: vignette + grain
