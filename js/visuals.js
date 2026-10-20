@@ -274,7 +274,9 @@ export function sparkline(canvas, values, color) {
 // A side-view runner posed every frame from running-gait joint angles: hip,
 // knee and ankle curves for each leg, counter-swinging arms with bent elbows,
 // a forward lean, the dip at mid-stance and a short flight phase. The stance
-// foot stays planted while the ground scrolls under it at the same speed.
+// foot stays planted while the base path scrolls under it at the same speed.
+// Behind him: a ballpark (see buildBallpark) filling the round Run button.
+let parkCount = 0;
 export function createRunner(svg) {
   const NS = 'http://www.w3.org/2000/svg';
   const CYCLE = 0.72;                        // seconds per stride (two steps), ~167 steps/min
@@ -340,10 +342,14 @@ export function createRunner(svg) {
 
   const el = (tag, cls, parent) => { const e = document.createElementNS(NS, tag); if (cls) e.setAttribute('class', cls); parent.appendChild(e); return e; };
   svg.textContent = '';
-  const shadow = el('ellipse', 'shadow', svg);
+  svg.setAttribute('viewBox', '0 0 120 120');
+  const park = buildBallpark(svg);
+  // The runner is drawn in his own 120-unit frame, scaled down onto the base path.
+  const K = 0.6, figure = el('g', null, park.front);
+  figure.setAttribute('transform', `translate(${f(park.runX - HIP_X * K)} ${f(park.path - GROUND * K)}) scale(${K})`);
+  const shadow = el('ellipse', 'shadow', figure);
   shadow.setAttribute('cx', HIP_X + 2); shadow.setAttribute('cy', GROUND + 0.8); shadow.setAttribute('ry', 1.8);
-  const ground = el('path', 'ground', svg); ground.setAttribute('d', `M8 ${GROUND + 0.5}H112`);
-  const body = el('g', 'body', svg);
+  const body = el('g', 'body', figure);
   const part = (g, cls) => el('path', cls, g);
   // Uniform: cream jersey and pants with red piping, red belt, socks and helmet,
   // red cleats with black soles and spikes, navy batting gloves with red straps.
@@ -452,7 +458,7 @@ export function createRunner(svg) {
     if (!t0) t0 = now;
     const t = (now - t0) / 1000;
     pose(t / CYCLE);
-    ground.style.strokeDashoffset = f((t * speed) % 16);
+    park.scroll(t * speed * K);
   }
   function start() { if (raf) return; if (reduceMotion()) { pose(0.43); return; } t0 = 0; raf = requestAnimationFrame(frame); }
   function stop() { cancelAnimationFrame(raf); raf = 0; }
@@ -460,4 +466,94 @@ export function createRunner(svg) {
   pose(0.43);
   start();
   return { start, stop };
+}
+
+// ---------- Ballpark (behind the runner) ----------
+// A day game in light mode, a night game under the lights in dark mode: stands
+// packed with Mii-style fans who bounce and wave out of step, the outfield
+// wall, grass, and the base path with its chalk line and a base coming by.
+// Everything sits in the button's 120×120 circle; scroll(d) moves the dirt and
+// the bases by d units so they keep pace with the runner's planted foot.
+function buildBallpark(svg) {
+  const NS = 'http://www.w3.org/2000/svg', id = `park${++parkCount}`;
+  const el = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent.appendChild(e); return e; };
+  const PATH = 86, BASE_GAP = 210, DIRT_TILE = 24;
+
+  const defs = el('defs', {}, svg);
+  el('circle', { cx: 60, cy: 60, r: 59.6 }, el('clipPath', { id: `${id}-clip` }, defs));
+  const sky = el('linearGradient', { id: `${id}-sky`, x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
+  el('stop', { offset: 0, class: 'sky-top' }, sky); el('stop', { offset: 1, class: 'sky-low' }, sky);
+  const glow = el('radialGradient', { id: `${id}-glow` }, defs);
+  el('stop', { offset: 0, class: 'glow-in' }, glow); el('stop', { offset: 1, class: 'glow-out' }, glow);
+  const dirt = el('pattern', { id: `${id}-dirt`, width: DIRT_TILE, height: 7, patternUnits: 'userSpaceOnUse' }, defs);
+  el('rect', { width: DIRT_TILE, height: 7, class: 'dirt' }, dirt);
+  for (const [x, y, r] of [[2, 1.5, 0.35], [7.5, 4.8, 0.45], [12, 2.2, 0.3], [16.5, 5.6, 0.4], [20.5, 1.2, 0.3], [5, 6.3, 0.25], [14, 0.6, 0.25], [22.5, 4, 0.35]])
+    el('circle', { cx: x, cy: y, r, class: 'pebble' }, dirt);
+
+  const scene = el('g', { 'clip-path': `url(#${id}-clip)`, class: 'park' }, svg);
+  el('rect', { width: 120, height: 60, fill: `url(#${id}-sky)` }, scene);
+  const lights = el('g', { class: 'lights' }, scene);
+  for (const x of [40, 80]) {
+    el('circle', { cx: x, cy: 6.5, r: 12, fill: `url(#${id}-glow)` }, lights);
+    el('rect', { x: x - 4.5, y: 4, width: 9, height: 4.2, rx: 0.6, class: 'bulbs' }, lights);
+    el('path', { d: `M${x - 3.4} 5.4H${x + 3.4}M${x - 3.4} 6.8H${x + 3.4}`, class: 'bulb-lines' }, lights);
+  }
+  el('rect', { y: 11, width: 120, height: 5.5, class: 'facade' }, scene);
+  el('rect', { y: 16.5, width: 120, height: 0.8, class: 'trim' }, scene);
+  el('rect', { y: 17.3, width: 120, height: 34, class: 'stands' }, scene);
+
+  // Crowd: four tiers, back to front, built once from a fixed seed.
+  let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const pick = (a) => a[Math.floor(rnd() * a.length)];
+  const SHIRTS = ['#c41e3a', '#c41e3a', '#c41e3a', '#c41e3a', '#f2ead6', '#f2ead6', '#0c2340', '#0c2340', '#ffffff', '#89cff0', '#f5c242', '#4caf50', '#f08a24', '#f48fb1', '#8e6ad8', '#9ccc65'];
+  const SKINS = ['#f6d7b8', '#eac39a', '#d9a77b', '#c08a64', '#9a6a48', '#6e4a32'];
+  const HAIRS = ['#2b1d14', '#4a2f1e', '#7a4b2a', '#c98a3d', '#e0c27a', '#1a1a1a', '#8c8c8c'];
+  const HAIR = {
+    short: (c) => `<path fill="${c}" d="M-3.55 -9.3A3.55 3.55 0 0 1 3.55 -9.3C2.4 -10.7 -2.4 -10.7 -3.55 -9.3Z"/>`,
+    long: (c) => `<path fill="${c}" d="M-3.8 -6.6V-9.6A3.8 3.8 0 0 1 3.8 -9.6V-6.6L2.9 -7V-9.3C2 -10.9 -2 -10.9 -2.9 -9.3V-7Z"/>`,
+    bun: (c) => `<path fill="${c}" d="M-3.55 -9.3A3.55 3.55 0 0 1 3.55 -9.3C2.4 -10.7 -2.4 -10.7 -3.55 -9.3Z"/><circle fill="${c}" cy="-13.4" r="1.4"/>`,
+    cap: () => '<path fill="#c41e3a" d="M-3.6 -9.9A3.6 3.6 0 0 1 3.6 -9.9Z"/><rect fill="#a3182f" x="-4.1" y="-10.4" width="8.2" height="1.1" rx="0.55"/>',
+    none: () => '',
+  };
+  const ARMS = {
+    up: [[-4.4, -10.8], [4.4, -10.8]],
+    one: [[-3.6, -1.6], [4.6, -10.8]],
+    clap: [[-0.5, -7.6], [0.5, -7.6]],
+  };
+  const fan = (x, y, sc) => {
+    const shirt = pick(SHIRTS), skin = pick(SKINS), hair = pick(['short', 'short', 'long', 'bun', 'cap', 'cap', 'none']), arms = pick(['up', 'up', 'up', 'one', 'clap']);
+    const delay = `animation-delay:${(-rnd() * 2).toFixed(2)}s;animation-duration:${(0.55 + rnd() * 0.45).toFixed(2)}s`;
+    const [l, r] = ARMS[arms];
+    const arm = (side, [hx, hy]) => `<g class="arm ${side}" style="${delay}"><path stroke="${shirt}" d="M${side === 'l' ? -2.3 : 2.3} -5.2L${hx} ${hy}"/><circle fill="${skin}" cx="${hx}" cy="${hy}" r="0.95"/></g>`;
+    const face = sc > 0.5 ? '<ellipse class="eye" cx="-1.15" cy="-9.7" rx="0.38" ry="0.6"/><ellipse class="eye" cx="1.15" cy="-9.7" rx="0.38" ry="0.6"/><path class="mouth" d="M-1.15 -8.2Q0 -6.8 1.15 -8.2Z"/>' : '';
+    return `<g transform="translate(${x.toFixed(2)} ${y}) scale(${sc})"><g class="fan ${arms}" style="${delay}">${arm('l', l)}${arm('r', r)}`
+      + `<rect fill="${shirt}" x="-3" y="-6.4" width="6" height="7.4" rx="2.6"/><circle fill="${skin}" cy="-9.6" r="3.5"/>${HAIR[hair](pick(HAIRS))}${face}</g></g>`;
+  };
+  const crowd = el('g', { class: 'crowd' }, scene);
+  let html = '';
+  for (const [y, sc] of [[24, 0.36], [31, 0.44], [39, 0.54], [48, 0.68]]) {
+    html += `<rect class="seats" y="${y - 3.2 * sc}" width="120" height="${3.2 * sc}"/>`;
+    const half = Math.sqrt(60 * 60 - (y - 9 - 60) ** 2) + 4, step = 7.4 * sc;
+    for (let x = 60 - half + rnd() * step; x < 60 + half; x += step * (0.9 + rnd() * 0.25)) html += fan(x, y, sc);
+  }
+  crowd.innerHTML = html;
+
+  el('rect', { y: 50, width: 120, height: 7, class: 'wall' }, scene);
+  el('rect', { y: 50, width: 120, height: 0.9, class: 'wall-cap' }, scene);
+  el('rect', { y: 57, width: 120, height: 63, class: 'grass' }, scene);
+  el('rect', { y: 57, width: 120, height: 1.2, class: 'track' }, scene);
+  const path = el('rect', { y: PATH - 9, width: 120, height: 15, fill: `url(#${id}-dirt)` }, scene);
+  el('rect', { y: PATH + 3.2, width: 120, height: 0.9, class: 'chalk' }, scene);
+  const base = el('g', { class: 'base' }, scene);
+  el('ellipse', { cx: 0.6, cy: 1.3, rx: 5.2, ry: 1, class: 'base-shadow' }, base);
+  el('rect', { x: -4.4, y: -1.1, width: 8.8, height: 2.4, rx: 0.6, class: 'bag' }, base);
+  el('rect', { x: -4.4, y: -1.1, width: 8.8, height: 0.8, rx: 0.4, class: 'bag-top' }, base);
+  const front = el('g', {}, scene);
+
+  function scroll(d) {
+    dirt.setAttribute('patternTransform', `translate(${(-(d % DIRT_TILE)).toFixed(2)} 0)`);
+    base.setAttribute('transform', `translate(${(132 - (d % BASE_GAP)).toFixed(2)} ${PATH - 0.6})`);
+  }
+  scroll(40);
+  return { front, path: PATH, runX: 52, scroll };
 }
