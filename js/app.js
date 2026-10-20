@@ -1,6 +1,6 @@
 import * as net from './net.js';
 import { kv, results, outages, loadSettings, saveSettings, uid } from './store.js';
-import { createSwirl, createGauge, lineChart, barChart, sparkline } from './visuals.js';
+import { createSwirl, createGauge, lineChart, barChart, sparkline, cssVar } from './visuals.js';
 import { SERVICES } from './services.js';
 
 // ---------- helpers ----------
@@ -25,10 +25,10 @@ const ICON = {
   cellular: '<svg viewBox="0 0 24 24"><path d="M5 19v-3M10 19v-6M15 19V9M20 19V5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
   unknown: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4 12h16M12 4c2.5 2.5 2.5 13.5 0 16M12 4c-2.5 2.5-2.5 13.5 0 16" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>',
   star: '<svg viewBox="0 0 24 24"><path d="M12 3.2l2.6 5.5 6 .8-4.4 4.1 1.1 5.9L12 16.6l-5.3 2.9 1.1-5.9-4.4-4.1 6-.8z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>',
-  down: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="9" fill="#ef4444"/><path d="M12 7.5v5.5" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><circle cx="12" cy="16.5" r="1.4" fill="#fff"/></svg>',
-  issues: '<svg viewBox="0 0 24 24"><path d="M12 3c.8 0 1.4.4 1.8 1l7.6 13.4c.8 1.4-.2 3.1-1.8 3.1H4.4c-1.6 0-2.6-1.7-1.8-3.1L10.2 4c.4-.6 1-1 1.8-1z" fill="#fbbf24"/><path d="M12 9v4.6" stroke="#1a1d33" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="17" r="1.3" fill="#1a1d33"/></svg>',
-  ok: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="rgba(52,211,153,.16)"/><path d="M7.8 12.3l2.8 2.8 5.6-5.8" fill="none" stroke="#34d399" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  pending: '<svg viewBox="0 0 24 24"><circle cx="7" cy="12" r="1.6" fill="#5d6286"/><circle cx="12" cy="12" r="1.6" fill="#5d6286"/><circle cx="17" cy="12" r="1.6" fill="#5d6286"/></svg>',
+  down: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 7.8v5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="16" r="1.1" fill="currentColor"/></svg>',
+  issues: '<svg viewBox="0 0 24 24"><path d="M12 4.2l8.3 14.6H3.7z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 10v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="16.4" r="1" fill="currentColor"/></svg>',
+  ok: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8.4 12.2l2.5 2.5 4.8-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  pending: '<svg viewBox="0 0 24 24"><circle cx="7" cy="12" r="1.4" fill="currentColor"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/><circle cx="17" cy="12" r="1.4" fill="currentColor"/></svg>',
   play: '<svg viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z" fill="currentColor"/></svg>',
 };
 
@@ -97,7 +97,7 @@ function renderInfo() {
 
 function renderIdleHint() {
   const last = [...S.results].reverse().find((r) => r.type === 'speed');
-  $('#lastHint').innerHTML = last ? `Last test ${ago(last.ts)}: <b>${fmt(last.down)}</b> ↓ / <b>${fmt(last.up)}</b> ↑ Mbps` : 'Tap GO to test your connection';
+  $('#lastHint').innerHTML = last ? `Last test ${ago(last.ts)}: <b>${fmt(last.down)}</b> ↓ / <b>${fmt(last.up)}</b> ↑ Mbps` : 'Tap Go to test your connection';
 }
 
 // ---------- navigation ----------
@@ -239,7 +239,7 @@ function planCard(r) {
   const verdict = pct >= 0.8 ? "You're getting what you pay for." : pct >= 0.5 ? 'A bit below your plan.' : 'Well below your plan.';
   const wifiNote = pct < 0.8 && r.conn === 'wifi' ? ' Wi-Fi is often the bottleneck. Test right next to the router (or plugged in) to tell Wi-Fi from your provider.' : '';
   const upLine = pu ? `<p>Upload: ${fmt(r.up)} of ${pu} Mbps (${Math.round((r.up / pu) * 100)}%)</p>` : '';
-  return `<div class="card"><h4>Your plan</h4><b style="font:600 18px var(--display)">${Math.round(pct * 100)}% of ${p} Mbps</b>
+  return `<div class="card"><h4>Your plan</h4><b class="big">${Math.round(pct * 100)}% of ${p} Mbps</b>
     <div class="bar"><i style="width:${Math.min(100, pct * 100)}%;background:${cls}"></i></div><p>${verdict}${wifiNote}</p>${upLine}</div>`;
 }
 function showResult(r) {
@@ -274,7 +274,7 @@ function showResult(r) {
 function renderVideo() {
   const o = $('#videoOverlay'); const st = S.video.state;
   $('#videoStatus').hidden = st !== 'running';
-  if (st === 'running') { o.innerHTML = '<button class="text-btn" data-act="vcancel" style="position:absolute;top:10px;left:12px;color:#fff">✕ Cancel</button>'; o.style.background = 'none'; return; }
+  if (st === 'running') { o.innerHTML = '<button class="text-btn" data-act="vcancel" style="position:absolute;top:10px;left:12px">✕ Cancel</button>'; o.style.background = 'none'; return; }
   o.style.background = '';
   if (st === 'done' && S.video.result) {
     const v = S.video.result.video;
@@ -337,8 +337,8 @@ function svcRow(s) {
     <div class="svc-row">
       <button class="star ${fav ? 'on' : ''}" data-act="fav" aria-label="${fav ? 'Remove from' : 'Add to'} favorites">${ICON.star}</button>
       <button class="svc-name" data-act="open" style="text-align:left">${esc(s.name)}</button>
-      <span class="sicon" title="${st}">${ICON[st]}</span>
-      <canvas class="spark" data-spark="${esc(s.id)}" data-color="${st === 'down' ? '#ef4444' : st === 'issues' ? '#fbbf24' : '#34d399'}"></canvas>
+      <span class="sicon ${st}" title="${st}">${ICON[st]}</span>
+      <canvas class="spark" data-spark="${esc(s.id)}" data-color="${st === 'down' ? '--bad' : st === 'issues' ? '--warn' : st === 'ok' ? '--good' : '--dim'}"></canvas>
     </div>
     ${open ? `<div class="svc-detail"><span>${reachTxt}</span>${off ? `<span>${off}</span>` : ''}${r ? `<span>Checked ${ago(r.at)}</span>` : ''}
       <div class="links"><button class="text-btn" data-act="check" style="padding-left:0">Check now</button>
@@ -353,7 +353,7 @@ function renderStatus() {
   const sort = (a, b) => ORDER[svcState(S.status.last[a.id])] - ORDER[svcState(S.status.last[b.id])] || a.name.localeCompare(b.name);
   const favs = list.filter((s) => S.settings.favorites.includes(s.id)).sort(sort);
   const rest = list.filter((s) => !S.settings.favorites.includes(s.id)).sort(sort);
-  let html = `<div class="group-label"><span style="color:#3b82f6;display:grid;width:20px">${ICON.star}</span>Favorites</div>`;
+  let html = `<div class="group-label"><span style="color:var(--up);display:grid">${ICON.star}</span>Favorites</div>`;
   html += favs.length ? favs.map(svcRow).join('') : '<p class="sub" style="padding:10px 16px">Tap a star to keep a service here. Favorites are checked each time you open this tab.</p>';
   html += `<div class="group-label" style="margin-top:12px">All services</div>` + (rest.length ? rest.map(svcRow).join('') : '<p class="sub" style="padding:10px 16px">No matches.</p>');
   $('#statusList').innerHTML = html;
@@ -364,7 +364,7 @@ function renderStatus() {
 function drawSparks() {
   $$('canvas[data-spark]').forEach((c) => {
     const h = S.status.hist[c.dataset.spark] || [];
-    sparkline(c, h.map((x) => (x == null ? 7000 : x)), c.dataset.color);
+    sparkline(c, h.map((x) => (x == null ? 7000 : x)), cssVar(c.dataset.color));
   });
 }
 let checking = false;
@@ -467,7 +467,7 @@ async function renderMap() {
   $('#roomList').innerHTML = rooms.length ? rooms.map((r) => {
     const st = stats[r.id];
     return `<div class="card room-card" data-room="${r.id}">
-      <div><b style="font:600 17px var(--display)"><span style="color:${roomColor(st, ref)}">●</span> ${esc(r.name)}</b></div>
+      <div class="room-name"><i style="background:${roomColor(st, ref)}"></i>${esc(r.name)}</div>
       <div class="row-btns"><button class="text-btn" data-act="test">Test here</button><button class="text-btn" data-act="edit" style="color:var(--muted)">Edit</button></div>
       <div class="stats">${st.n ? `<span>↓ <b>${fmt(st.down)}</b> Mbps</span><span>↑ <b>${fmt(st.up)}</b> Mbps</span><span>Ping <b>${fmtMs(st.ping)}</b> ms</span><span>${st.n} test${st.n > 1 ? 's' : ''}</span>` : '<span>No tests yet</span>'}${r.x == null ? '<span>Not on the map</span>' : ''}</div>
     </div>`;
@@ -601,18 +601,18 @@ function renderHistory() {
     <div class="stat-grid"><div class="stat"><span>Typical ↓</span><b style="color:var(--down)">${fmt(md)}</b><span>Mbps</span></div>
       <div class="stat"><span>Typical ↑</span><b style="color:var(--up)">${fmt(mu)}</b><span>Mbps</span></div>
       <div class="stat"><span>Typical ping</span><b>${fmtMs(mp)}</b><span>ms</span></div></div>
-    ${plan ? `<div class="card"><h4>Getting what you pay for?</h4><b style="font:600 18px var(--display)">${Math.round(planPct * 100)}% of tests hit 80%+ of your ${plan} Mbps plan</b>
+    ${plan ? `<div class="card"><h4>Getting what you pay for?</h4><b class="big">${Math.round(planPct * 100)}% of tests hit 80%+ of your ${plan} Mbps plan</b>
       <div class="bar"><i style="width:${planPct * 100}%;background:${planPct >= 0.8 ? 'var(--good)' : planPct >= 0.5 ? 'var(--warn)' : 'var(--bad)'}"></i></div>
       ${cost ? `<p>You pay about <b>$${cost.toFixed(2)}</b> per Mbps you actually get ($${S.settings.monthlyCost}/month).</p>` : ''}</div>` : ''}
-    <div class="card"><div class="section-head"><h4>Speed over time</h4><div class="legend"><span><i style="background:var(--down)"></i>Down</span><span><i style="background:var(--up)"></i>Up</span></div></div><canvas class="chart" id="hChart"></canvas></div>
+    <div class="card"><div class="section-head"><h4>Speed over time</h4><div class="legend"><span><i style="background:var(--down)"></i>Download</span><span><i style="background:var(--up)"></i>Upload</span></div></div><canvas class="chart" id="hChart"></canvas></div>
     ${filled.length >= 3 ? `<div class="card"><h4>By time of day</h4><canvas class="chart" id="hHours"></canvas><p>${slow ? `Slowest around <b style="color:var(--fg)">${blabels[slow[1]]}–${blabels[(slow[1] + 1) % 8]}</b>, when neighbors are online too.` : ''}</p></div>` : ''}
     ${vs}
     <div class="card"><div class="section-head"><h4>All tests</h4><button class="text-btn" data-act="csv">Export CSV</button></div>
       <div class="list">${list.map((r) => `<button class="rrow" data-id="${r.id}"><span class="when">${dateFmt.format(r.ts)}<small>${r.conn === 'cellular' ? 'Cellular' : 'Wi-Fi'}${roomName(r.room) ? ' · ' + esc(roomName(r.room)) : ''}</small></span><b class="d">${fmt(r.down)}</b><b class="u">${fmt(r.up)}</b><b>${fmtMs(r.ping)}<small> ms</small></b></button>`).join('')}</div></div>
   </div>`;
   const pts = rs.slice(-60);
-  lineChart($('#hChart'), [{ color: '#22d3ee', points: pts.map((r) => [r.ts, r.down]) }, { color: '#a78bfa', points: pts.map((r) => [r.ts, r.up]) }], { plan });
-  if ($('#hHours')) barChart($('#hHours'), bvals, { labels: blabels, color: '#22d3ee' });
+  lineChart($('#hChart'), [{ color: cssVar('--down'), points: pts.map((r) => [r.ts, r.down]) }, { color: cssVar('--up'), points: pts.map((r) => [r.ts, r.up]) }], { plan });
+  if ($('#hHours')) barChart($('#hHours'), bvals, { labels: blabels, color: cssVar('--down') });
 }
 const emptyState = (t, s) => `<div class="empty"><b>${t}</b><span>${s}</span></div>`;
 function onHistoryChange(e) {
@@ -690,7 +690,7 @@ function renderOutages(body) {
   const total = list.reduce((s, o) => s + ((o.end || Date.now()) - o.start), 0) / 1000;
   const status = !S.settings.watch ? ['off', 'Not watching'] : openOutage ? ['bad', 'Offline right now'] : ['', 'Online · checking every 15 seconds'];
   body.innerHTML = `<div class="stack">
-    <div class="card"><div class="watch"><div><b style="font:600 17px var(--display)">Watch for outages</b><p><span class="pulse ${status[0]}"></span>${status[1]}</p></div>
+    <div class="card"><div class="watch"><div><b class="big" style="font-size:17px">Watch for outages</b><p><span class="pulse ${status[0]}"></span>${status[1]}</p></div>
       <label class="switch"><input type="checkbox" id="watchToggle" ${S.settings.watch ? 'checked' : ''} aria-label="Watch for outages"><span></span></label></div>
       <p>Web apps can only check while they're open. To log around the clock, leave Speedy open on a Mac or a spare phone on its charger.</p>
       ${S.settings.watch && 'wakeLock' in navigator ? `<div class="watch"><span>Keep screen on while watching</span><label class="switch"><input type="checkbox" id="wakeToggle" ${S.keepAwake ? 'checked' : ''} aria-label="Keep screen on"><span></span></label></div>` : ''}
