@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Speedy</title>
+<meta name="description" content="Private speed test: download, upload, lag under load, video quality, service status and Wi-Fi dead spots.">
+<meta name="theme-color" content="#0b0d1a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Speedy">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://speed.cloudflare.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Sora:wght@300;400;600;700&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="app">
+  <header class="top">
+    <span class="top-side"></span>
+    <div class="brand" aria-label="Speedy">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.6 17.5a9 9 0 1 1 14.8 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M12 13.2l4.2-4.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      SPEEDY
+    </div>
+    <button class="icon-btn top-side" id="menuBtn" aria-label="Settings">
+      <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </button>
+  </header>
+
+  <main id="main">
+    <!-- SPEED -->
+    <section class="tab" id="tab-speed" data-tab="speed">
+      <div class="speed-stage">
+        <div class="metrics" id="metrics" hidden>
+          <div class="metric down"><span class="m-label"><i class="arrow">↓</i>DOWNLOAD <small>Mbps</small></span><b id="mDown">–</b></div>
+          <div class="metric up"><span class="m-label"><i class="arrow">↑</i>UPLOAD <small>Mbps</small></span><b id="mUp">–</b></div>
+          <div class="pings">
+            <span>Ping <small>ms</small></span>
+            <span title="Idle"><i class="dot idle"></i><b id="mPing">–</b></span>
+            <span title="While downloading"><i class="dot down"></i><b id="mPingDown">–</b></span>
+            <span title="While uploading"><i class="dot up"></i><b id="mPingUp">–</b></span>
+          </div>
+        </div>
+
+        <div class="idle-view" id="idleView">
+          <button class="go" id="goBtn" aria-label="Start speed test"><span>GO</span></button>
+          <p class="hint" id="lastHint"></p>
+        </div>
+
+        <div class="run-view" id="runView" hidden>
+          <div class="gauge-wrap">
+            <canvas id="gauge"></canvas>
+            <div class="readout"><span class="phase" id="phase">Ping</span><b id="live">0.00</b><small>Mbps</small></div>
+          </div>
+          <div class="progress"><i id="prog"></i></div>
+          <button class="text-btn" id="cancelBtn">Cancel</button>
+        </div>
+
+        <div class="result-view" id="resultView" hidden></div>
+      </div>
+
+      <div class="info-sheet" id="infoSheet">
+        <div class="grab"></div>
+        <div class="info-row">
+          <span class="conn-badge" id="connIcon"></span>
+          <div class="info-text">
+            <b id="ispName">Finding your provider…</b>
+            <span id="deviceName"></span>
+          </div>
+        </div>
+        <div class="chips">
+          <button class="chip" id="roomChip"></button>
+          <button class="chip" id="connChip"></button>
+          <span class="chip ghost" id="serverChip"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIDEO -->
+    <section class="tab video-tab" id="tab-video" data-tab="video" hidden>
+      <canvas id="swirl"></canvas>
+      <div class="video-overlay" id="videoOverlay"></div>
+      <div class="video-status" id="videoStatus" hidden>
+        <div class="vprog"><i id="vprog"></i></div>
+        <div class="vstat-row"><span class="conn-mini" id="vConn"></span><span id="vText">Testing adaptive bitrate…</span></div>
+      </div>
+    </section>
+
+    <!-- STATUS -->
+    <section class="tab" id="tab-status" data-tab="status" hidden>
+      <div class="status-head">
+        <p class="powered">Checked from <b id="statusFrom">your network</b> · official status pages</p>
+        <div class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M16 16l4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><input id="statusSearch" type="search" placeholder="Search services" autocomplete="off"></div>
+      </div>
+      <div class="status-actions"><button class="text-btn" id="checkAllBtn">Check all</button><span id="checkedAt"></span><button class="text-btn" id="addSvcBtn">+ Add service</button></div>
+      <div id="statusList"></div>
+    </section>
+
+    <!-- MAP -->
+    <section class="tab pad" id="tab-map" data-tab="map" hidden>
+      <div class="section-head"><h2>Your place</h2>
+        <div class="row-btns"><label class="text-btn file-btn">Floor plan<input type="file" id="planFile" accept="image/*"></label><button class="text-btn" id="addRoomBtn">+ Room</button></div>
+      </div>
+      <p class="sub" id="mapHint">Drop a pin for each room, then test from each one. Pins turn red where your Wi-Fi is weak.</p>
+      <div class="floor" id="floor"><img id="floorImg" alt="" hidden><div id="pins"></div><div class="place-banner" id="placeBanner" hidden>Tap where this room is</div></div>
+      <div id="roomCallout"></div>
+      <div id="roomList" class="cards"></div>
+    </section>
+
+    <!-- HISTORY -->
+    <section class="tab pad" id="tab-history" data-tab="history" hidden>
+      <div class="seg" id="histSeg">
+        <button data-v="speed" class="on">Speed</button><button data-v="video">Video</button><button data-v="outages">Outages</button>
+      </div>
+      <div id="histBody"></div>
+    </section>
+  </main>
+
+  <nav class="tabbar" id="tabbar">
+    <button data-tab="speed" class="on"><svg viewBox="0 0 24 24"><path d="M4.6 17.5a9 9 0 1 1 14.8 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M12 13.2l4.2-4.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>Speed</span></button>
+    <button data-tab="video"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg><span>Video</span></button>
+    <button data-tab="status"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 7.5v5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="16.3" r="1.2" fill="currentColor"/></svg><span>Status</span></button>
+    <button data-tab="map"><svg viewBox="0 0 24 24"><path d="M12 21s-6.5-6-6.5-11a6.5 6.5 0 0 1 13 0c0 5-6.5 11-6.5 11z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="10" r="2.3" fill="none" stroke="currentColor" stroke-width="1.8"/></svg><span>Map</span></button>
+    <button data-tab="history"><svg viewBox="0 0 24 24"><path d="M4 19h16M7 16v-5M12 16V7M17 16v-8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>History</span></button>
+  </nav>
+
+  <div class="scrim" id="scrim" hidden></div>
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true" hidden>
+    <div class="grab"></div>
+    <div class="sheet-head"><h3 id="sheetTitle"></h3><button class="icon-btn" id="sheetClose" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></div>
+    <div class="sheet-body" id="sheetBody"></div>
+  </div>
+  <div class="toast" id="toast" hidden></div>
+</div>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

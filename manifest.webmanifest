@@ -1,0 +1,21 @@
+{
+  "name": "Speedy",
+  "short_name": "Speedy",
+  "description": "Private speed test: download, upload, lag under load, video quality, service status and Wi-Fi dead spots.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0d1a",
+  "theme_color": "#0b0d1a",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Run a speed test", "short_name": "Test now", "url": "./?go=1", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Video test", "url": "./#video" },
+    { "name": "Service status", "url": "./#status" }
+  ]
+}
