@@ -1,6 +1,6 @@
 import * as net from './net.js';
 import { kv, results, outages, loadSettings, saveSettings, uid } from './store.js';
-import { createSwirl, createGauge, createRunner, lineChart, barChart, sparkline, cssVar } from './visuals.js';
+import { createSwirl, createFrameMeter, createGauge, createRunner, lineChart, barChart, sparkline, cssVar } from './visuals.js';
 import { SERVICES } from './services.js';
 
 // ---------- helpers ----------
@@ -275,6 +275,20 @@ function showResult(r) {
 }
 
 // ---------- video test ----------
+// Which ladder qualities the panel shows at native resolution, and the frame
+// rate it can show them at (streaming video tops out at 60 fps).
+const QH = { '360p': 360, '480p': 480, '720p': 720, '1080p': 1080, '1440p': 1440, '4K': 2160 };
+function displayInfo(d) {
+  if (!d) return null;
+  const dpr = devicePixelRatio || 1, w = Math.round(screen.width * dpr), h = Math.round(screen.height * dpr), short = Math.min(w, h);
+  const fit = net.LADDER.filter((r) => QH[r.q] <= short * 1.05);
+  return { ...d, panel: `${Math.max(w, h)}×${short}`, maxQ: (fit.at(-1) || net.LADDER[0]).q, fps: Math.min(60, d.hz) };
+}
+const dropText = (d) => (d.dropped ? `${d.dropped} of ${d.frames} frames dropped` : `${d.frames} frames, none dropped`);
+const displayLadder = (d) => (d ? `<div class="ladder">
+    <div class="rung"><b>Display</b><span class="st">${d.hz} Hz · ${dropText(d)}</span><span class="${d.smooth ? 'ok' : 'no'}">${d.smooth ? '✓ Smooth' : '✕ Drops frames'}</span></div>
+    <div class="rung"><b>Screen</b><span class="st">${d.panel} · ${d.smooth ? `${d.maxQ} and below at full ${d.fps} fps` : `up to ${d.maxQ}, but ${d.fps} fps video may stutter`}</span><span class="${d.smooth ? 'ok' : 'no'}">${d.maxQ}</span></div>
+  </div>` : '');
 function renderVideo() {
   const o = $('#videoOverlay'); const st = S.video.state;
   $('#videoStatus').hidden = st !== 'running';
@@ -286,12 +300,13 @@ function renderVideo() {
       <div class="best">${esc(v.best)}</div>
       <p>Video starts in about <b>${v.startup ? (v.startup / 1000).toFixed(1) : '–'} s</b>. Used ${fmtBytes(v.bytes)}.</p>
       <div class="ladder">${v.rungs.map((r) => `<div class="rung"><b>${r.q}</b><span class="st">${r.mbps} Mbps stream · loads in ${r.startup ? (r.startup / 1000).toFixed(2) + ' s' : '–'}</span><span class="${r.ok ? 'ok' : 'no'}">${r.ok ? '✓ Smooth' : '✕ Buffers'}</span></div>`).join('')}</div>
+      ${displayLadder(v.display)}
       <button class="play" data-act="video" aria-label="Test again" style="width:84px">${ICON.play}</button>`;
     return;
   }
   o.innerHTML = `<h2>Video test</h2><p>Plays video at every quality from 360p to 4K, the way Netflix or YouTube would, and shows which ones stream without buffering.</p>
     <button class="play" data-act="video" aria-label="Start video test">${ICON.play}</button>
-    <p style="font-size:13px;color:var(--muted)">Uses about 30–60 MB of data.</p>`;
+    <p style="font-size:13px;color:var(--muted)">Uses about 30–60 MB of data. Also checks your screen's refresh rate.</p>${displayLadder(S.video.display)}`;
 }
 async function runVideo() {
   if (S.running) return;
@@ -299,9 +314,17 @@ async function runVideo() {
   swirl.set(0.25);
   let wake; try { wake = await navigator.wakeLock?.request('screen'); } catch {}
   const total = net.LADDER.length; let idx = 0;
+  // Refresh rate is read in a quiet second first, with the swirl paused: on slow
+  // GPUs the swirl alone can drop frames, and the meter would read its frame rate
+  // instead of the panel's. Dropped frames are then counted during the stream,
+  // under real playback load. The meter's rAF callback is trivial and fetch bodies
+  // arrive off the main thread, so it doesn't skew the bitrate results.
+  const meter = createFrameMeter();
   try {
-    $('#vText').textContent = 'Testing adaptive bitrate…'; $('#vprog').style.width = '2%';
-    await sleep(900);
+    $('#vText').textContent = 'Checking your display…'; $('#vprog').style.width = '2%';
+    swirl.stop(); meter.start(); await sleep(1000); meter.lock(); swirl.start();
+    $('#vText').textContent = 'Testing adaptive bitrate…';
+    await sleep(400); meter.clear(); // don't count the swirl's own restart as dropped frames
     const v = await net.videoTest({
       signal: S.abort.signal,
       onStep: ({ rung, phase, throughput }) => {
@@ -310,11 +333,13 @@ async function runVideo() {
         $('#vprog').style.width = (((idx + (phase === 'done' ? 1 : 0.5)) / total) * 100).toFixed(0) + '%';
       },
     });
+    v.display = S.video.display = displayInfo(meter.stop());
     const r = { id: uid(), ts: Date.now(), type: 'video', video: v, isp: S.settings.ispName || S.info?.isp, conn: conn(), room: S.settings.room || null };
     await results.put(r); S.results.push(r);
-    S.video = { state: 'done', result: r };
+    S.video = { state: 'done', result: r, display: v.display };
     swirl.burst();
   } catch (e) {
+    S.video.display = displayInfo(meter.stop());
     S.video.state = S.video.result ? 'done' : 'idle';
     toast(e.name === 'AbortError' ? 'Video test cancelled' : "Couldn't reach the test server. Check that you're online.");
   } finally {
@@ -576,7 +601,7 @@ function renderHistory() {
   </div>`;
   if (S.hist.seg === 'video') {
     const vs = filtered('video').reverse();
-    body.innerHTML = chips + (vs.length ? `<div class="list">${vs.map((r) => `<button class="rrow" data-id="${r.id}"><span class="when">${dateFmt.format(r.ts)}<small>${esc(roomName(r.room) || r.isp || '')}</small></span><span></span><span></span><b class="d">${esc(r.video.best)}</b></button>`).join('')}</div>`
+    body.innerHTML = chips + (vs.length ? `<div class="list">${vs.map((r) => `<button class="rrow" data-id="${r.id}"><span class="when">${dateFmt.format(r.ts)}<small>${esc(roomName(r.room) || r.isp || '')}</small></span><span></span><span>${r.video.display ? r.video.display.hz + ' Hz' : ''}</span><b class="d">${esc(r.video.best)}</b></button>`).join('')}</div>`
       : emptyState('No video tests yet', 'Run one from the Video tab to see which quality you can stream.'));
     return;
   }
@@ -634,7 +659,7 @@ function onHistoryClick(e) {
 function openResult(id) {
   const r = S.results.find((x) => x.id === id); if (!r) return;
   const body = r.type === 'video'
-    ? `<div class="kv"><span>Best smooth quality</span><span>${esc(r.video.best)}</span><span>Video start time</span><span>${r.video.startup ? (r.video.startup / 1000).toFixed(2) + ' s' : '–'}</span>${r.video.rungs.map((x) => `<span>${x.q}</span><span>${x.ok ? '✓ Smooth' : '✕ Buffers'}</span>`).join('')}<span>Data used</span><span>${fmtBytes(r.video.bytes)}</span></div>`
+    ? `<div class="kv"><span>Best smooth quality</span><span>${esc(r.video.best)}</span><span>Video start time</span><span>${r.video.startup ? (r.video.startup / 1000).toFixed(2) + ' s' : '–'}</span>${r.video.rungs.map((x) => `<span>${x.q}</span><span>${x.ok ? '✓ Smooth' : '✕ Buffers'}</span>`).join('')}${r.video.display ? `<span>Display</span><span>${r.video.display.hz} Hz · ${r.video.display.smooth ? 'smooth' : 'drops frames'}</span><span>Frames</span><span>${dropText(r.video.display)}</span><span>Screen</span><span>${r.video.display.panel} · up to ${r.video.display.maxQ} at ${r.video.display.fps} fps</span>` : ''}<span>Data used</span><span>${fmtBytes(r.video.bytes)}</span></div>`
     : `<div class="kv"><span>Download</span><span>${fmt(r.down)} Mbps</span><span>Upload</span><span>${fmt(r.up)} Mbps</span><span>Ping (idle)</span><span>${fmtMs(r.ping)} ms</span>
       <span>Ping while downloading</span><span>${fmtMs(r.loadedDown)} ms</span><span>Ping while uploading</span><span>${fmtMs(r.loadedUp)} ms</span><span>Lag-when-busy grade</span><span>${esc(r.bloat || '–')}</span>
       <span>Jitter</span><span>${fmtMs(r.jitter)} ms</span><span>Provider</span><span>${esc(r.isp || '–')}</span><span>Connection</span><span>${r.conn === 'cellular' ? 'Cellular' : 'Wi-Fi'}</span>
@@ -648,8 +673,8 @@ function openResult(id) {
   });
 }
 async function exportCSV() {
-  const rows = [['date', 'type', 'download_mbps', 'upload_mbps', 'ping_ms', 'jitter_ms', 'ping_loaded_down_ms', 'ping_loaded_up_ms', 'bufferbloat_grade', 'best_video', 'connection', 'room', 'provider', 'server', 'lat', 'lon']];
-  for (const r of S.results) rows.push([new Date(r.ts).toISOString(), r.type, r.down?.toFixed(2), r.up?.toFixed(2), r.ping?.toFixed(1), r.jitter?.toFixed(1), r.loadedDown?.toFixed(1), r.loadedUp?.toFixed(1), r.bloat, r.video?.best, r.conn, roomName(r.room), r.isp, r.colo, r.lat, r.lon]);
+  const rows = [['date', 'type', 'download_mbps', 'upload_mbps', 'ping_ms', 'jitter_ms', 'ping_loaded_down_ms', 'ping_loaded_up_ms', 'bufferbloat_grade', 'best_video', 'display_hz', 'frames_dropped', 'frames_total', 'screen_max_video', 'connection', 'room', 'provider', 'server', 'lat', 'lon']];
+  for (const r of S.results) rows.push([new Date(r.ts).toISOString(), r.type, r.down?.toFixed(2), r.up?.toFixed(2), r.ping?.toFixed(1), r.jitter?.toFixed(1), r.loadedDown?.toFixed(1), r.loadedUp?.toFixed(1), r.bloat, r.video?.best, r.video?.display?.hz, r.video?.display?.dropped, r.video?.display?.frames, r.video?.display?.maxQ, r.conn, roomName(r.room), r.isp, r.colo, r.lat, r.lon]);
   const csv = rows.map((r) => r.map((v) => (v == null ? '' : /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : v)).join(',')).join('\n');
   const file = new File([csv], `speedy-results-${new Date().toISOString().slice(0, 10)}.csv`, { type: 'text/csv' });
   try { if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'Speedy results' }); return; } } catch (e) { if (e.name === 'AbortError') return; }
