@@ -1,11 +1,11 @@
 // Speedy service worker: keeps the app itself available offline.
 // Speed tests and status checks always go straight to the network.
-const VERSION = 'speedy-v6';
+const VERSION = 'speedy-v7';
 const SHELL = ['./', 'index.html', 'styles.css', 'js/app.js', 'js/net.js', 'js/store.js', 'js/visuals.js', 'js/services.js',
   'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', (e) => {
   e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
