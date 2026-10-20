@@ -100,6 +100,8 @@ main { flex: 1; min-height: 0; position: relative; overflow: hidden; }
 /* result */
 .result-view { width: 100%; max-width: 520px; display: flex; flex-direction: column; gap: 12px; padding-top: 4px; padding-bottom: 8px; }
 .again { align-self: center; width: 92px; aspect-ratio: 1; border-radius: 50%; position: relative; display: grid; place-items: center; font: 600 15px var(--display); margin: 4px 0; }
+.again svg { width: 34px; height: 34px; }
+.again:active svg { transform: rotate(90deg); }
 .again::before { content: ''; position: absolute; inset: 0; border-radius: 50%; padding: 2px; background: conic-gradient(var(--ring-a), var(--ring-b), var(--ring-a));
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
 .card { background: var(--sheet); border-radius: 18px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
