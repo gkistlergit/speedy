@@ -25,7 +25,7 @@
   <header class="top">
     <span class="top-side"></span>
     <div class="brand" aria-label="Speedy">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.6 17.5a9 9 0 1 1 14.8 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M12 13.2l4.2-4.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <img class="brand-icon" src="icons/icon-192.png" alt="" width="24" height="24">
       Speedy
     </div>
     <button class="icon-btn top-side" id="menuBtn" aria-label="Settings">
@@ -49,7 +49,25 @@
         </div>
 
         <div class="idle-view" id="idleView">
-          <button class="go" id="goBtn" aria-label="Start speed test"><span>Go</span></button>
+          <button class="go" id="goBtn" aria-label="Start speed test">
+            <svg class="runner" viewBox="0 0 120 120" aria-hidden="true">
+              <g class="speedlines"><path d="M14 52h16M8 62h20M16 72h12"/></g>
+              <path class="ground" d="M10 104H110"/>
+              <g class="body">
+                <g class="lean">
+                  <g class="arm arm-back"><path class="upper" d="M60 52V63"/><g class="fore"><path d="M60 63V72"/></g></g>
+                  <g class="leg leg-back"><path class="thigh" d="M60 74V88"/><g class="shin"><path class="sock" d="M60 88V99"/><ellipse class="shoe" cx="63" cy="100.5" rx="5" ry="2.6"/></g></g>
+                  <rect class="jersey" x="51.5" y="45" width="17" height="31" rx="7"/>
+                  <path class="stripe" d="M52 66h16"/>
+                  <circle class="head" cx="62" cy="36" r="8.5"/>
+                  <path class="cap" d="M53.4 35a8.6 8.6 0 0 1 17.2 0z"/>
+                  <path class="brim" d="M69.5 33.6h7.8a1.6 1.6 0 0 1 0 3.2h-7.8z"/>
+                  <g class="leg leg-front"><path class="thigh" d="M60 74V88"/><g class="shin"><path class="sock" d="M60 88V99"/><ellipse class="shoe" cx="63" cy="100.5" rx="5" ry="2.6"/></g></g>
+                  <g class="arm arm-front"><path class="upper" d="M60 52V63"/><g class="fore"><path d="M60 63V72"/></g></g>
+                </g>
+              </g>
+            </svg>
+          </button>
           <p class="hint" id="lastHint"></p>
         </div>
 

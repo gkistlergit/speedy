@@ -49,7 +49,7 @@ b { font-weight: 500; }
 .top { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; height: 56px; flex: none;
   padding-left: max(12px, env(safe-area-inset-left, 0px)); padding-right: max(12px, env(safe-area-inset-right, 0px)); }
 .brand { justify-self: center; display: flex; align-items: center; gap: 8px; font: 500 17px/1 var(--ui); letter-spacing: -0.01em; color: var(--fg); text-transform: none; }
-.brand svg { width: 20px; height: 20px; color: var(--down); }
+.brand-icon { width: 24px; height: 24px; border-radius: 6px; display: block; }
 .icon-btn { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; color: var(--muted); }
 .icon-btn svg { width: 22px; height: 22px; }
 .icon-btn:hover { background: var(--surface-2); color: var(--fg); }
@@ -73,7 +73,35 @@ main { flex: 1; min-height: 0; position: relative; overflow: hidden; }
 .go { width: min(56vw, 220px); aspect-ratio: 1; border-radius: 50%; position: relative; display: grid; place-items: center; isolation: isolate;
   background: var(--surface); border: 1px solid var(--line-strong); box-shadow: var(--shadow); transition: transform 0.2s ease, border-color 0.2s; }
 .go::after { content: ''; position: absolute; inset: -14px; border-radius: 50%; z-index: -1; border: 1px solid var(--down); opacity: 0.35; animation: breathe 3.6s ease-in-out infinite; }
-.go span { font: 300 clamp(40px, 13vw, 54px)/1 var(--ui); letter-spacing: -0.03em; }
+/* runner: an original kid ballplayer running in side view */
+.runner { width: 78%; height: 78%; overflow: visible; --jersey: #e6d6bb; --cap: #3e4a3d; --skin: #d6a47a; --pants: #efe7da; --sock: #b07a55; --ink: #2a2722; --shoe: #2a2722; }
+@media (prefers-color-scheme: dark) { .runner { --cap: #7d9472; --ink: #0d0b09; --shoe: #a07a5c; --pants: #e2d8c8; } }
+.runner * { transform-box: view-box; }
+.runner .ground { stroke: var(--line-strong); stroke-width: 2; stroke-linecap: round; stroke-dasharray: 7 9; animation: ground 0.45s linear infinite; }
+.runner .speedlines path { stroke: var(--dim); stroke-width: 2; stroke-linecap: round; fill: none; animation: whoosh 0.9s ease-in-out infinite; }
+.runner .body { animation: bob 0.45s ease-in-out infinite; }
+.runner .lean { transform: rotate(9deg); transform-origin: 60px 74px; }
+.runner .jersey { fill: var(--jersey); stroke: var(--ink); stroke-width: 1.6; }
+.runner .stripe { stroke: var(--sock); stroke-width: 2.4; }
+.runner .head { fill: var(--skin); stroke: var(--ink); stroke-width: 1.6; }
+.runner .cap, .runner .brim { fill: var(--cap); stroke: var(--ink); stroke-width: 1.2; stroke-linejoin: round; }
+.runner .thigh { stroke: var(--pants); stroke-width: 7.5; stroke-linecap: round; }
+.runner .sock { stroke: var(--sock); stroke-width: 5.5; stroke-linecap: round; }
+.runner .shoe { fill: var(--shoe); }
+.runner .upper { stroke: var(--jersey); stroke-width: 6; stroke-linecap: round; }
+.runner .fore path { stroke: var(--skin); stroke-width: 4.6; stroke-linecap: round; }
+.runner .leg-back, .runner .arm-back { filter: brightness(0.82); }
+.runner .leg { transform-origin: 60px 74px; animation: thigh 0.45s linear infinite; }
+.runner .shin { transform-origin: 60px 88px; animation: shin 0.45s linear infinite; }
+.runner .arm { transform-origin: 60px 52px; animation: arm 0.45s ease-in-out infinite; }
+.runner .fore { transform-origin: 60px 63px; transform: rotate(-80deg); }
+.runner .leg-back, .runner .leg-back .shin, .runner .arm-front { animation-delay: -0.225s; }
+@keyframes thigh { 0% { transform: rotate(-38deg); } 50% { transform: rotate(36deg); } 100% { transform: rotate(-38deg); } }
+@keyframes shin { 0% { transform: rotate(12deg); } 30% { transform: rotate(18deg); } 55% { transform: rotate(40deg); } 75% { transform: rotate(105deg); } 100% { transform: rotate(12deg); } }
+@keyframes arm { 0% { transform: rotate(48deg); } 50% { transform: rotate(-52deg); } 100% { transform: rotate(48deg); } }
+@keyframes bob { 0%, 50%, 100% { transform: translateY(0); } 25%, 75% { transform: translateY(-3px); } }
+@keyframes ground { to { stroke-dashoffset: 16; } }
+@keyframes whoosh { 0%, 100% { opacity: 0.25; transform: translateX(4px); } 50% { opacity: 0.8; transform: translateX(-4px); } }
 .go:hover { border-color: var(--down); }
 .go:active { transform: scale(0.98); }
 @keyframes breathe { 50% { opacity: 0.08; transform: scale(1.05); } }
@@ -303,6 +331,6 @@ main { flex: 1; min-height: 0; position: relative; overflow: hidden; }
   .info-sheet { max-width: 640px; margin: 0 auto; width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .go::after, .pulse { animation: none; }
+  .go::after, .pulse, .runner *, .runner .body { animation: none !important; }
   .sheet { animation: none; }
 }
