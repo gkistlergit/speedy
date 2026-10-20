@@ -1,6 +1,6 @@
 import * as net from './net.js';
 import { kv, results, outages, loadSettings, saveSettings, uid } from './store.js';
-import { createSwirl, createGauge, lineChart, barChart, sparkline, cssVar } from './visuals.js';
+import { createSwirl, createGauge, createRunner, lineChart, barChart, sparkline, cssVar } from './visuals.js';
 import { SERVICES } from './services.js';
 
 // ---------- helpers ----------
@@ -44,6 +44,7 @@ let gauge, swirl;
 
 // ---------- boot ----------
 async function boot() {
+  createRunner($('.runner'));
   S.settings = await loadSettings();
   S.results = ((await results.all()) || []).sort((a, b) => a.ts - b.ts);
   S.outages = ((await outages.all()) || []).sort((a, b) => a.start - b.start);
