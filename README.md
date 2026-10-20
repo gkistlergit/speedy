@@ -7,7 +7,7 @@ A private, ad-free speed test you install on your iPhone or Mac home screen. It'
 | Tab | What you get |
 |---|---|
 | **Speed** | Download, upload, ping and jitter, plus a lag-when-busy grade (bufferbloat), a check against your plan, and what the connection handles (4K, video calls, gaming). |
-| **Video** | Plays simulated video at 360p, 480p, 720p, 1080p, 1440p and 4K and shows which qualities stream without buffering. |
+| **Video** | Plays simulated video at 360p, 480p, 720p, 1080p, 1440p and 4K and shows which qualities stream without buffering, plus your screen's refresh rate, dropped frames and the highest quality it can show at full frame rate. |
 | **Status** | Checks whether services (Netflix, PSN, Xfinity and more) are reachable from your network, plus the official status page for services that publish one. Links to Downdetector's free web reports. |
 | **Map** | Upload a floor plan, drop a pin for each room and test from each one. Pins turn red at dead spots. |
 | **History** | Charts, typical speeds, % of tests that hit your plan, cost per Mbps, slowest time of day, Wi-Fi vs cellular, CSV export and the outage log. |
