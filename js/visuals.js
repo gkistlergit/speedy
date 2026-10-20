@@ -327,6 +327,16 @@ export function createRunner(svg) {
     const endR = (last[1] + last[2]) / 2, startR = (first[1] + first[2]) / 2;
     return outline([...front, cap(at(last[0], (last[1] - last[2]) / 2), endR, 1), ...back, cap(at(first[0], (first[1] - first[2]) / 2), startR, -1)]);
   }
+  // The same for a segment that points up (torso, neck): stations still run from a, front stays in front.
+  const limbUp = (a, b, stations) => limb(b, a, stations.map(([t, fw, bw]) => [1 - t, fw, bw]).reverse());
+  // A flat band across a segment between points a and b on its axis (a sleeve cuff, a belt, a glove strap).
+  function band(a, b, wf, wb) {
+    const dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy) || 1, n = [dy / len, -dx / len];
+    const pt = (o, w) => `${f(o[0] + n[0] * w)} ${f(o[1] + n[1] * w)}`;
+    return `M${pt(a, wf)}L${pt(b, wf)}L${pt(b, -wb)}L${pt(a, -wb)}Z`;
+  }
+  const lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+  const line = (pts) => 'M' + pts.map((pt) => `${f(pt[0])} ${f(pt[1])}`).join('L');
 
   const el = (tag, cls, parent) => { const e = document.createElementNS(NS, tag); if (cls) e.setAttribute('class', cls); parent.appendChild(e); return e; };
   svg.textContent = '';
@@ -335,14 +345,19 @@ export function createRunner(svg) {
   const ground = el('path', 'ground', svg); ground.setAttribute('d', `M8 ${GROUND + 0.5}H112`);
   const body = el('g', 'body', svg);
   const part = (g, cls) => el('path', cls, g);
-  const makeArm = (g) => ({ upper: part(g, 'skin'), fore: part(g, 'skin'), hand: part(g, 'skin'), sleeve: part(g, 'shirt') });
-  const makeLeg = (g) => ({ thigh: part(g, 'skin'), shin: part(g, 'skin'), sock: part(g, 'sock'), shoe: part(g, 'shoe'), sole: part(g, 'sole'), short: part(g, 'shorts') });
+  // Uniform: cream jersey and pants with red piping, red belt, socks and helmet,
+  // red cleats with black soles and spikes, navy batting gloves with red straps.
+  const makeArm = (g) => ({ upper: part(g, 'skin'), fore: part(g, 'skin'), hand: part(g, 'glove'), strap: part(g, 'red'), sleeve: part(g, 'cream'), cuff: part(g, 'red') });
+  const SPIKES = [-2.8, -0.9, 3.2, 5.0, 6.7].map((x) => `M${x - 0.55} 3.5L${x} 4.5L${x + 0.55} 3.5Z`).join(''); // in the foot frame
+  const spikes = (g) => { const e = part(g, 'spikes'); e.setAttribute('d', SPIKES); return e; };
+  const makeLeg = (g) => ({ sock: part(g, 'red'), spikes: spikes(g), shoe: part(g, 'red'), sole: part(g, 'sole'),
+    thigh: part(g, 'cream'), shin: part(g, 'cream'), piping: part(g, 'piping') });
   const farG = el('g', 'far', body);
   const farArm = makeArm(farG), farLeg = makeLeg(farG);
-  const torso = part(body, 'shirt'), pelvis = part(body, 'shorts');
+  const torso = part(body, 'cream'), placket = part(body, 'piping'), pelvis = part(body, 'cream'), belt = part(body, 'red');
   const nearLeg = makeLeg(el('g', 'near', body));
   const neck = part(body, 'skin'), head = part(body, 'skin'), hair = part(body, 'hair');
-  const helmet = part(body, 'helmet'), brim = part(body, 'helmet'), earHole = part(body, 'ear-hole'), shine = part(body, 'shine');
+  const helmet = part(body, 'red'), brim = part(body, 'red'), earHole = part(body, 'ear-hole'), shine = part(body, 'shine');
   const nearArm = makeArm(el('g', 'near', body));
 
   // Leg pose with the hip at the origin; the foot is drawn in its own frame
@@ -372,20 +387,24 @@ export function createRunner(svg) {
   const hipAt = (p) => { const x = ((p % 1) + 1) % 1 * N, i = Math.floor(x), s = x - i; return hipY[i % N] * (1 - s) + hipY[(i + 1) % N] * s; };
 
   function drawLeg(parts, g) {
-    parts.thigh.setAttribute('d', limb(g.o, g.k, [[0, 4.3, 4.7], [0.45, 3.9, 3.7], [1, 2.6, 2.7]]));
-    parts.short.setAttribute('d', limb(g.o, along(g.o, Math.atan2(g.k[0] - g.o[0], g.k[1] - g.o[1]) * 180 / Math.PI, L.thigh * 0.36), [[0, 4.6, 5.0], [1, 4.25, 4.15]]));
-    parts.shin.setAttribute('d', limb(g.k, g.a, [[0, 2.6, 2.6], [0.3, 2.3, 3.4], [0.72, 1.6, 1.8], [1, 1.4, 1.6]]));
-    const sockTop = [g.k[0] + (g.a[0] - g.k[0]) * 0.8, g.k[1] + (g.a[1] - g.k[1]) * 0.8];
-    parts.sock.setAttribute('d', limb(sockTop, g.a, [[0, 1.75, 1.95], [1, 1.6, 1.75]]));
+    // High-cuffed baseball pants end below the knee; red socks run from the cuff to the cleat.
+    const cuff = lerp(g.k, g.a, 0.5);
+    parts.sock.setAttribute('d', limb(lerp(g.k, g.a, 0.35), g.a, [[0, 2.4, 3.3], [0.45, 1.9, 2.5], [1, 1.5, 1.65]]));
+    parts.thigh.setAttribute('d', limb(g.o, g.k, [[0, 4.9, 5.3], [0.45, 4.4, 4.3], [1, 3.3, 3.4]]));
+    parts.shin.setAttribute('d', limb(g.k, cuff, [[0, 3.3, 3.4], [0.55, 2.8, 3.7], [1, 2.5, 3.3]]));
+    parts.piping.setAttribute('d', line([lerp(g.o, g.k, 0.12), g.k, lerp(g.k, cuff, 0.9)]));
     parts.shoe.setAttribute('d', outline(SHOE.map((pt) => rot(g.a, g.foot, pt))));
     parts.sole.setAttribute('d', outline([[-3.6, 2.4], [1, 2.7], [6.6, 2.6], [8.1, 2.3], [7.9, 3.1], [6.4, 3.6], [1, 3.7], [-3.3, 3.4]].map((pt) => rot(g.a, g.foot, pt))));
+    parts.spikes.setAttribute('transform', `translate(${f(g.a[0])} ${f(g.a[1])}) rotate(${f(g.foot)})`);
   }
   function drawArm(parts, s, sh, el) {
     const e = along(s, sh, L.upper), fa = sh + el, w = along(e, fa, L.fore), h = along(w, fa + 12, 2.6);
     parts.upper.setAttribute('d', limb(s, e, [[0, 2.7, 2.9], [0.5, 2.2, 2.4], [1, 1.75, 1.85]]));
-    parts.sleeve.setAttribute('d', limb(s, along(s, sh, L.upper * 0.42), [[0, 3.4, 3.5], [1, 2.9, 2.9]]));
+    parts.sleeve.setAttribute('d', limb(s, along(s, sh, L.upper * 0.5), [[0, 3.5, 3.6], [1, 3.0, 3.0]]));
+    parts.cuff.setAttribute('d', band(along(s, sh, L.upper * 0.47), along(s, sh, L.upper * 0.53), 3.0, 3.0));
     parts.fore.setAttribute('d', limb(e, w, [[0, 1.8, 1.9], [0.35, 1.9, 2.1], [1, 1.25, 1.3]]));
-    parts.hand.setAttribute('d', limb(w, h, [[0, 1.55, 1.5], [0.6, 2.0, 1.9], [1, 1.6, 1.5]]));
+    parts.hand.setAttribute('d', limb(along(w, fa, -1.1), h, [[0, 1.45, 1.5], [0.5, 1.75, 1.7], [0.8, 2.1, 2.0], [1, 1.7, 1.6]]));
+    parts.strap.setAttribute('d', band(along(w, fa, -0.9), along(w, fa, -0.1), 1.6, 1.65));
   }
 
   function pose(p) {
@@ -395,13 +414,19 @@ export function createRunner(svg) {
     const top = along(o, 180 - lean, L.torso), base = along(o, -lean, 2.5);
     const sh = along(o, 180 - lean, L.torso - 2.6); // shoulder joint, a little below the top of the torso
 
-    torso.setAttribute('d', limb(base, top, [[0, 4.8, 5.4], [0.35, 4.3, 4.0], [0.72, 5.6, 4.2], [0.92, 4.4, 4.4], [1, 3.4, 3.8]]));
-    pelvis.setAttribute('d', limb(base, along(o, 180 - lean, 6), [[0, 4.6, 5.0], [1, 4.4, 4.1]]));
+    const chest = [[0, 4.8, 5.4], [0.35, 4.4, 4.1], [0.72, 5.4, 4.6], [0.92, 4.5, 4.5], [1, 3.4, 3.8]];
+    torso.setAttribute('d', limbUp(base, top, chest));
+    // Placket piping: a red line just inside the front of the jersey, collar to belt.
+    const u = [(top[0] - base[0]) / L.torso, (top[1] - base[1]) / L.torso], fwd = [-u[1], u[0]];
+    const frontW = (t) => { let i = 0; while (chest[i + 1][0] < t) i++; const [t0, w0] = chest[i], [t1, w1] = chest[i + 1]; return w0 + (w1 - w0) * (t - t0) / (t1 - t0); };
+    placket.setAttribute('d', line([0.3, 0.45, 0.6, 0.75, 0.88].map((t) => { const c = lerp(base, top, t), w = frontW(t) - 1.1; return [c[0] + fwd[0] * w, c[1] + fwd[1] * w]; })));
+    pelvis.setAttribute('d', limbUp(base, along(o, 180 - lean, 6.4), [[0, 4.9, 5.4], [1, 4.5, 4.2]]));
+    belt.setAttribute('d', band(along(o, 180 - lean, 6.6), along(o, 180 - lean, 5.0), 4.55, 4.25));
     drawLeg(farLeg, legPose(p + 0.5, o));
     drawLeg(nearLeg, legPose(p, o));
 
     const nb = along(top, 180 - lean - 6, 0.8), nt = along(nb, 180 - lean - 10, L.neck + 1.2);
-    neck.setAttribute('d', limb(nb, nt, [[0, 2.2, 2.4], [1, 1.9, 2.0]]));
+    neck.setAttribute('d', limbUp(nb, nt, [[0, 2.2, 2.4], [1, 1.9, 2.0]]));
     // Head in its own frame: origin at the top of the neck, x forward, y down, tilted with the trunk.
     const tilt = -(lean - 4), H = (pts) => pts.map((pt) => rot(nt, tilt, pt));
     head.setAttribute('d', outline(H([[-4.4, -4.6], [-3.6, -8.4], [0, -10.4], [3.6, -9.2], [4.6, -6.6], [4.9, -5.2], [6.0, -3.6], [4.9, -3.0], [5.0, -2.0], [4.2, -0.6], [2.4, 0.2], [0.4, -0.2], [-2.2, -0.6], [-4.3, -2.2]])));
