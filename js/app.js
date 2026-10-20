@@ -107,7 +107,7 @@ function renderInfo() {
 
 function renderIdleHint() {
   const last = [...S.results].reverse().find((r) => r.type === 'speed');
-  $('#lastHint').innerHTML = last ? `Last test ${ago(last.ts)}: <b>${fmt(last.down)}</b> ↓ / <b>${fmt(last.up)}</b> ↑ Mbps` : 'Tap Go to test your connection';
+  $('#lastHint').innerHTML = last ? `Last test ${ago(last.ts)}: <b>${fmt(last.down)}</b> ↓ / <b>${fmt(last.up)}</b> ↑ Mbps` : 'Tap the runner to test your connection';
 }
 
 // ---------- navigation ----------
