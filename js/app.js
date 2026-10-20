@@ -250,7 +250,7 @@ function showResult(r) {
   setMetric('#mPingDown', r.loadedDown, fmtMs); setMetric('#mPingUp', r.loadedUp, fmtMs);
   const rn = roomName(r.room);
   v.innerHTML = `
-    <button class="again" data-act="again">Again</button>
+    <button class="again" data-act="again" aria-label="Test again" title="Test again"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M19.8 3.8v4.6h-4.6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     <div class="card"><h4>Lag when busy</h4>
       <div class="grade-row"><div class="grade ${gradeClass(r.bloat)}">${esc(r.bloat || '?')}</div>
       <p>Ping goes from <b>${fmtMs(r.ping)} ms</b> to <b>${fmtMs(Math.max(r.loadedDown ?? 0, r.loadedUp ?? 0))} ms</b> under load. ${BLOAT_TEXT[r.bloat] || ''}</p></div>

@@ -46,7 +46,8 @@ export async function networkInfo() {
   try {
     const m = await getJSON(`${CF}/meta`);
     if (m && (m.asOrganization || m.clientIp)) {
-      return { org: m.asOrganization || '', isp: prettyIsp(m.asOrganization), ip: m.clientIp, city: m.city, region: m.region, colo: m.colo, source: 'cloudflare' };
+      const colo = m.colo && typeof m.colo === 'object' ? [m.colo.city, m.colo.iata && `(${m.colo.iata})`].filter(Boolean).join(' ') : m.colo;
+      return { org: m.asOrganization || '', isp: prettyIsp(m.asOrganization), ip: m.clientIp, city: m.city, region: m.region, colo, source: 'cloudflare' };
     }
   } catch {}
   try {
