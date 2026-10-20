@@ -1,6 +1,6 @@
 // Speedy service worker: keeps the app itself available offline.
 // Speed tests and status checks always go straight to the network.
-const VERSION = 'speedy-v9';
+const VERSION = 'speedy-v10';
 const SHELL = ['./', 'index.html', 'styles.css', 'js/app.js', 'js/net.js', 'js/store.js', 'js/visuals.js', 'js/services.js',
   'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png', 'icons/brand.svg'];
 

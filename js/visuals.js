@@ -1,67 +1,140 @@
 const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 export const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#888888';
 
-// ---------- Particle swirl (video test backdrop) ----------
-export function createSwirl(canvas) {
+// ---------- Test-footage player (video test) ----------
+// Renders a looping dusk scene with the Speedy runner into an offscreen
+// frame at the quality being tested (360 px tall for 360p, and so on),
+// then scales it to the player, so low qualities really look soft.
+// Stalls (freezes) while buffering, like a real player.
+const lerpKeys = (keys, p) => {
+  for (let i = 1; i < keys.length; i++) {
+    if (p <= keys[i][0]) { const [p0, v0] = keys[i - 1], [p1, v1] = keys[i]; return v0 + ((p - p0) / (p1 - p0)) * (v1 - v0); }
+  }
+  return keys[keys.length - 1][1];
+};
+const THIGH = [[0, -38], [0.5, 36], [1, -38]];
+const SHIN = [[0, 12], [0.3, 18], [0.55, 40], [0.75, 105], [1, 12]];
+const ridge = (x, seed, amp) => (Math.sin(x * 1.3 + seed) * 0.5 + Math.sin(x * 2.9 + seed * 2.1) * 0.3 + Math.sin(x * 6.1 + seed * 0.7) * 0.2) * amp;
+const R = { jersey: '#e6d6bb', cap: '#7d9472', skin: '#d6a47a', pants: '#e2d8c8', sock: '#b07a55', shoe: '#a07a5c', ink: '#1a1612' };
+
+function drawRunner(c, phase) {
+  // Same figure as the idle-screen runner, in its 120-unit box (hip at 60,74).
+  const limb = (x0, y0, x1, y1, w, col) => { c.strokeStyle = col; c.lineWidth = w; c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke(); };
+  const leg = (p, dim) => {
+    c.save(); c.translate(60, 74); c.rotate((lerpKeys(THIGH, p) * Math.PI) / 180); limb(0, 0, 0, 14, 7.5, R.pants);
+    c.translate(0, 14); c.rotate((lerpKeys(SHIN, p) * Math.PI) / 180); limb(0, 0, 0, 11, 5.5, R.sock);
+    c.fillStyle = R.shoe; c.beginPath(); c.ellipse(3, 12.5, 5, 2.6, 0, 0, Math.PI * 2); c.fill(); c.restore();
+    if (dim) { /* dimmed via globalAlpha by caller */ }
+  };
+  const arm = (p) => {
+    const a = 48 - 100 * (0.5 - 0.5 * Math.cos(p * Math.PI * 2));
+    c.save(); c.translate(60, 52); c.rotate((a * Math.PI) / 180); limb(0, 0, 0, 11, 6, R.jersey);
+    c.translate(0, 11); c.rotate((-80 * Math.PI) / 180); limb(0, 0, 0, 9, 4.6, R.skin); c.restore();
+  };
+  const back = (phase + 0.5) % 1;
+  c.save(); c.lineCap = 'round'; c.lineJoin = 'round';
+  c.translate(0, -3 * Math.pow(Math.sin(phase * Math.PI * 2), 2));
+  c.translate(60, 74); c.rotate((9 * Math.PI) / 180); c.translate(-60, -74);
+  c.filter = 'brightness(0.8)'; arm(back); leg(back); c.filter = 'none';
+  c.fillStyle = R.jersey; c.strokeStyle = R.ink; c.lineWidth = 1.6;
+  c.beginPath(); c.roundRect(51.5, 45, 17, 31, 7); c.fill(); c.stroke();
+  limb(52, 66, 68, 66, 2.4, R.sock);
+  c.fillStyle = R.skin; c.lineWidth = 1.6; c.beginPath(); c.arc(62, 36, 8.5, 0, Math.PI * 2); c.fill(); c.stroke();
+  c.fillStyle = R.cap; c.lineWidth = 1.2; c.beginPath(); c.arc(62, 35, 8.6, Math.PI, 0); c.closePath(); c.fill(); c.stroke();
+  c.beginPath(); c.roundRect(69.5, 33.6, 9.4, 3.2, 1.6); c.fill(); c.stroke();
+  leg(phase); arm(phase);
+  c.restore();
+}
+
+function drawScene(c, w, h, t) {
+  // sky
+  const sky = c.createLinearGradient(0, 0, 0, h * 0.72);
+  sky.addColorStop(0, '#2c2f3c'); sky.addColorStop(0.5, '#8a6a63'); sky.addColorStop(1, '#e8bf8f');
+  c.fillStyle = sky; c.fillRect(0, 0, w, h);
+  // sun + glow
+  const sx = w * 0.68, sy = h * 0.5, sr = h * 0.085;
+  const glow = c.createRadialGradient(sx, sy, sr * 0.5, sx, sy, h * 0.6);
+  glow.addColorStop(0, 'rgba(255,224,170,0.55)'); glow.addColorStop(1, 'rgba(255,224,170,0)');
+  c.fillStyle = glow; c.fillRect(0, 0, w, h);
+  c.fillStyle = '#fbe6bd'; c.beginPath(); c.arc(sx, sy, sr, 0, Math.PI * 2); c.fill();
+  // clouds
+  c.fillStyle = 'rgba(255,236,214,0.18)';
+  for (let i = 0; i < 4; i++) {
+    const cx = ((i * 0.31 + 0.1 - t * 0.004 * (1 + i * 0.3)) % 1.3 + 1.3) % 1.3 * w - w * 0.15, cy = h * (0.14 + i * 0.07);
+    c.beginPath(); c.ellipse(cx, cy, w * 0.11, h * 0.018, 0, 0, Math.PI * 2); c.ellipse(cx + w * 0.05, cy - h * 0.012, w * 0.06, h * 0.016, 0, 0, Math.PI * 2); c.fill();
+  }
+  // three ridge layers, parallax
+  const layers = [[0.6, 0.06, '#7c6a72', 0.01, 1.1], [0.67, 0.07, '#6f8466', 0.03, 2.3], [0.75, 0.06, '#3e4a3d', 0.07, 3.7]];
+  for (const [base, amp, col, speed, seed] of layers) {
+    c.fillStyle = col; c.beginPath(); c.moveTo(0, h);
+    for (let x = 0; x <= w + 8; x += Math.max(4, w / 160)) c.lineTo(x, h * (base + ridge(x / w * 3 + t * speed * 3, seed, amp)));
+    c.lineTo(w, h); c.closePath(); c.fill();
+  }
+  // haze over the ridges
+  const haze = c.createLinearGradient(0, h * 0.55, 0, h * 0.8);
+  haze.addColorStop(0, 'rgba(232,191,143,0.22)'); haze.addColorStop(1, 'rgba(232,191,143,0)');
+  c.fillStyle = haze; c.fillRect(0, h * 0.5, w, h * 0.3);
+  // track
+  const gy = h * 0.8;
+  c.fillStyle = '#2a2420'; c.fillRect(0, gy, w, h - gy);
+  c.fillStyle = '#b07a55'; c.fillRect(0, gy, w, h * 0.012);
+  c.strokeStyle = 'rgba(237,230,218,0.5)'; c.lineWidth = Math.max(1, h * 0.006); c.setLineDash([w * 0.05, w * 0.05]);
+  c.lineDashOffset = (t * w * 0.42) % (w * 0.1); c.beginPath(); c.moveTo(0, gy + h * 0.09); c.lineTo(w, gy + h * 0.09); c.stroke(); c.setLineDash([]);
+  // fence posts whipping past
+  c.fillStyle = '#4a3c33';
+  const gap = w * 0.22, off = (t * w * 0.42) % gap;
+  for (let x = -off; x < w + gap; x += gap) { c.fillRect(x, gy - h * 0.07, Math.max(2, w * 0.006), h * 0.07); }
+  c.fillRect(0, gy - h * 0.055, w, Math.max(1, h * 0.004));
+  // runner, with speed lines
+  const k = (h * 0.42) / 77;
+  c.save(); c.translate(w * 0.3 - 60 * k, gy - 101 * k); c.scale(k, k);
+  c.strokeStyle = 'rgba(255,240,220,0.45)'; c.lineWidth = 2; c.lineCap = 'round';
+  for (const [y, len, ph] of [[54, 16, 0], [64, 22, 0.33], [74, 12, 0.66]]) {
+    const a = 0.5 + 0.5 * Math.sin((t * 2.2 + ph) * Math.PI * 2); c.globalAlpha = 0.25 + a * 0.6;
+    c.beginPath(); c.moveTo(34 - a * 6, y); c.lineTo(34 - a * 6 - len, y); c.stroke();
+  }
+  c.globalAlpha = 1;
+  drawRunner(c, (t / 0.45) % 1);
+  c.restore();
+  // vignette
+  const v = c.createRadialGradient(w / 2, h / 2, h * 0.35, w / 2, h / 2, h * 1.05);
+  v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.42)');
+  c.fillStyle = v; c.fillRect(0, 0, w, h);
+}
+
+export function createPlayer(canvas, ambient) {
   const ctx = canvas.getContext('2d');
-  const COLORS = ['#c9b79c', '#b07a55', '#8fa382', '#d8c7a8', '#a65e3f', '#e6dcc8', '#6f8466', '#c49a3a'];
-  let W = 0, H = 0, R = 0, parts = [], raf = 0, intensity = 0.35, target = 0.35, t = 0;
-  function spawn(anywhere) {
-    return {
-      r: anywhere ? Math.random() * R : R * (0.75 + Math.random() * 0.35),
-      a: Math.random() * Math.PI * 2,
-      w: (0.35 + Math.random()) * 0.012,
-      c: COLORS[(Math.random() * COLORS.length) | 0],
-      s: 0.5 + Math.random() * 1.7,
-      spark: Math.random() < 0.22,
-    };
-  }
-  function resize() {
+  const off = document.createElement('canvas'); const octx = off.getContext('2d');
+  const amb = ambient ? ambient.getContext('2d') : null;
+  let raf = 0, t = 0, last = 0, quality = 1080, stalled = false, dim = 0, frameN = 0;
+  function size() {
     const dpr = Math.min(2, devicePixelRatio || 1);
-    W = canvas.clientWidth; H = canvas.clientHeight; R = Math.hypot(W, H) / 1.7;
-    canvas.width = W * dpr; canvas.height = H * dpr;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const n = Math.round(Math.min(1100, (W * H) / 380));
-    parts = Array.from({ length: n }, () => spawn(true));
-    ctx.fillStyle = '#1f1b16'; ctx.fillRect(0, 0, W, H);
+    canvas.width = Math.round(canvas.clientWidth * dpr); canvas.height = Math.round(canvas.clientHeight * dpr);
+    if (ambient) { ambient.width = 48; ambient.height = 27; }
   }
-  function frame() {
-    t += 0.004 + intensity * 0.01;
-    intensity += (target - intensity) * 0.03;
-    const cx = W * 0.47 + Math.sin(t * 0.7) * W * 0.06;
-    const cy = H * 0.48 + Math.cos(t * 0.5) * H * 0.04;
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = 'rgba(31,27,22,0.16)';
-    ctx.fillRect(0, 0, W, H);
-    // nebula glow
-    ctx.globalCompositeOperation = 'lighter';
-    const blobs = [['176,122,85', 0], ['111,132,102', 2.1], ['201,183,156', 4.2]];
-    for (const [rgb, off] of blobs) {
-      const bx = cx + Math.cos(t + off) * W * 0.28, by = cy + Math.sin(t * 1.1 + off) * H * 0.22;
-      const g = ctx.createRadialGradient(bx, by, 0, bx, by, Math.max(W, H) * 0.45);
-      g.addColorStop(0, `rgba(${rgb},${0.04 + intensity * 0.03})`); g.addColorStop(1, `rgba(${rgb},0)`);
-      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-    }
-    const spin = 0.5 + intensity * 2.6, pull = 0.12 + intensity * 1.3;
-    for (const p of parts) {
-      const x0 = cx + Math.cos(p.a) * p.r, y0 = cy + Math.sin(p.a) * p.r * 0.86;
-      p.a += p.w * spin * (1 + 60 / (p.r + 30));
-      p.r -= pull * (0.25 + (p.r / R) * 1.4);
-      if (p.r < 6) Object.assign(p, spawn(false));
-      const x1 = cx + Math.cos(p.a) * p.r, y1 = cy + Math.sin(p.a) * p.r * 0.86;
-      ctx.globalAlpha = 0.5;
-      ctx.strokeStyle = p.c; ctx.lineWidth = p.s;
-      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
-      if (p.spark) { ctx.globalAlpha = 0.8; ctx.fillStyle = '#f3efe8'; ctx.fillRect(x1, y1, 1.4, 1.4); }
-    }
+  function render() {
+    if (!canvas.width) size();
+    const oh = Math.max(90, Math.min(quality, canvas.height)), ow = Math.round((oh * 16) / 9);
+    if (off.width !== ow || off.height !== oh) { off.width = ow; off.height = oh; }
+    drawScene(octx, ow, oh, t);
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = oh < canvas.height * 0.6 ? 'low' : 'high';
+    ctx.drawImage(off, 0, 0, canvas.width, canvas.height);
+    if (dim > 0.01) { ctx.fillStyle = `rgba(16,13,10,${dim})`; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+    if (amb && frameN++ % 6 === 0) amb.drawImage(off, 0, 0, 48, 27);
+  }
+  function frame(now) {
+    const dt = last ? Math.min(0.05, (now - last) / 1000) : 0; last = now;
+    if (!stalled) t += dt;
+    dim += ((stalled ? 0.35 : 0) - dim) * 0.15;
+    render();
     raf = requestAnimationFrame(frame);
   }
-  const ro = new ResizeObserver(() => resize());
+  const ro = new ResizeObserver(() => { size(); if (!raf) render(); });
   return {
-    start() { if (raf) return; ro.observe(canvas); resize(); if (reduceMotion()) { target = intensity = 0.1; for (let i = 0; i < 40; i++) { frame(); cancelAnimationFrame(raf); } raf = 0; return; } raf = requestAnimationFrame(frame); },
+    start() { if (raf) return; ro.observe(canvas); size(); last = 0; if (reduceMotion()) { t = 0.2; render(); return; } raf = requestAnimationFrame(frame); },
     stop() { cancelAnimationFrame(raf); raf = 0; ro.disconnect(); },
-    set(v) { target = Math.max(0, Math.min(1, v)); },
+    quality(px) { quality = px; if (!raf) render(); },
+    stall(on) { stalled = !!on; },
   };
 }
 
