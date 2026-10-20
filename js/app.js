@@ -58,7 +58,17 @@ async function boot() {
   loadInfo();
   closeStaleOutage();
   if (S.settings.watch) startWatch();
-  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+  if ('serviceWorker' in navigator && location.protocol === 'https:') {
+    const hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+    // When an update takes over, reload once so the new version shows (never mid-test).
+    let reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadController || reloaded) return;
+      const go = () => { if (!S.running) { reloaded = true; location.reload(); } else setTimeout(go, 2000); };
+      go();
+    });
+  }
   const p = new URLSearchParams(location.search);
   if (p.has('go') || hashTab === 'go') setTimeout(() => runSpeed(), 500);
 }
