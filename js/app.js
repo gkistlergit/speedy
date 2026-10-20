@@ -44,7 +44,7 @@ let gauge, swirl;
 
 // ---------- boot ----------
 async function boot() {
-  createRunner($('.runner'));
+  createRunner($('.runner'), $('.speed-stage'));
   S.settings = await loadSettings();
   S.results = ((await results.all()) || []).sort((a, b) => a.ts - b.ts);
   S.outages = ((await outages.all()) || []).sort((a, b) => a.start - b.start);

@@ -36,6 +36,7 @@
   <main id="main">
     <!-- SPEED -->
     <section class="tab" id="tab-speed" data-tab="speed">
+      <svg class="runner" viewBox="0 0 120 120" preserveAspectRatio="xMidYMid slice" aria-hidden="true"></svg>
       <div class="speed-stage">
         <div class="metrics" id="metrics" hidden>
           <div class="metric down"><span class="m-label"><i class="arrow">↓</i>DOWNLOAD <small>Mbps</small></span><b id="mDown">–</b></div>
@@ -49,10 +50,7 @@
         </div>
 
         <div class="idle-view" id="idleView">
-          <button class="go" id="goBtn" aria-label="Start speed test">
-            <svg class="runner" viewBox="0 0 120 120" aria-hidden="true"></svg>
-            <span class="go-label">Run</span>
-          </button>
+          <button class="go" id="goBtn" aria-label="Start speed test">Run</button>
         </div>
 
         <div class="run-view" id="runView" hidden>
