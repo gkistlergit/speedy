@@ -69,8 +69,8 @@ async function boot() {
       go();
     });
   }
-  const p = new URLSearchParams(location.search);
-  if (p.has('go') || hashTab === 'go') setTimeout(() => runSpeed(), 500);
+  // Speedy never starts a test by itself. Drop a leftover ?go / #go from old one-tap links.
+  if (/[?&]go\b/.test(location.search) || hashTab === 'go') { try { history.replaceState(null, '', location.pathname + (hashTab && hashTab !== 'go' ? '#' + hashTab : '')); } catch {} }
 }
 
 async function loadInfo() {
@@ -107,7 +107,7 @@ function renderInfo() {
 
 function renderIdleHint() {
   const last = [...S.results].reverse().find((r) => r.type === 'speed');
-  $('#lastHint').innerHTML = last ? `Last test ${ago(last.ts)}: <b>${fmt(last.down)}</b> ↓ / <b>${fmt(last.up)}</b> ↑ Mbps` : 'Tap the runner to test your connection';
+  $('#lastHint').innerHTML = last ? `Last test ${ago(last.ts)}: <b>${fmt(last.down)}</b> ↓ / <b>${fmt(last.up)}</b> ↑ Mbps` : 'Tap Run to test your connection';
 }
 
 // ---------- navigation ----------
@@ -718,7 +718,6 @@ async function clearOutages(btn) {
 // ---------- settings ----------
 function openSettings() {
   const s = S.settings;
-  const quick = location.origin + location.pathname + '?go=1';
   openSheet('Settings', `
     <div class="group"><h4>Your internet plan</h4>
       <div class="field-row"><label class="field"><span>Download (Mbps)</span><input id="planDown" type="number" inputmode="decimal" min="0" value="${s.planDown ?? ''}" placeholder="e.g. 400"></label>
@@ -733,8 +732,6 @@ function openSettings() {
     </div>
     <div class="group"><h4>Home screen</h4>
       <div class="setting"><div><span>Show last download speed on the app icon</span><small>Needs notification permission on iPhone</small></div><label class="switch"><input type="checkbox" id="badge" ${s.badge ? 'checked' : ''} aria-label="App icon badge"><span></span></label></div>
-      <div class="field"><span>One-tap test link. In the Shortcuts app, make a shortcut with "Open URLs" and this link, then add it to your Home Screen or Control Center.</span>
-        <div class="copy-box"><code id="quickLink">${esc(quick)}</code><button class="text-btn" id="copyQuick">Copy</button></div></div>
       <p class="sub" style="margin:0"><b style="color:var(--fg)">Install:</b> on iPhone, tap Share → Add to Home Screen. On a Mac, in Safari choose File → Add to Dock.</p>
     </div>
     <div class="group"><h4>Your data</h4>
@@ -744,9 +741,6 @@ function openSettings() {
     <p class="sub" style="margin:0">Speed tests run against Cloudflare's free public test servers, which see each test like any speed test site would. Your provider name comes from Cloudflare (or ipinfo.io as a backup). Status checks contact each service and its public status page directly.</p>
     <button class="btn primary" id="saveSettings">Save</button>`, (b) => {
     const num = (id) => { const v = parseFloat($(id, b).value); return isNaN(v) || v <= 0 ? null : v; };
-    $('#copyQuick', b).addEventListener('click', () => {
-      navigator.clipboard.writeText(quick).then(() => toast('Link copied'), () => { const r = document.createRange(); r.selectNodeContents($('#quickLink', b)); getSelection().removeAllRanges(); getSelection().addRange(r); });
-    });
     $('#badge', b).addEventListener('change', async (e) => {
       if (e.target.checked && window.Notification && Notification.permission === 'default') { try { await Notification.requestPermission(); } catch {} }
       if (!e.target.checked && navigator.clearAppBadge) navigator.clearAppBadge().catch(() => {});

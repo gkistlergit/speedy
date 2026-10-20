@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="110 110 804 804"><defs>
+  <linearGradient id="arc" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#9db08f"/><stop offset="1" stop-color="#d39b74"/></linearGradient>
+  <radialGradient id="bg" cx="0.5" cy="0.42" r="0.75"><stop offset="0" stop-color="#2a2621"/><stop offset="1" stop-color="#14120f"/></radialGradient>
+  <filter id="dim" x="-50%" y="-50%" width="200%" height="200%"><feColorMatrix type="matrix" values="0.8 0 0 0 0  0 0.8 0 0 0  0 0 0.8 0 0  0 0 0 1 0"/></filter>
+</defs>
+<path d="M257.4 774.6A360 360 0 1 1 860.7 430.5" fill="none" stroke="url(#arc)" stroke-width="70" stroke-linecap="round"/>
+<g transform="translate(56.0 31.200000000000045) scale(7.6)"><g transform="rotate(9 60 74)">
+  <g filter="url(#dim)"><g transform="rotate(-50 60 52)"><path d="M60 52V63" stroke="#e6d6bb" stroke-width="6" stroke-linecap="round"/><g transform="rotate(-80 60 63)"><path d="M60 63V72" stroke="#d6a47a" stroke-width="4.6" stroke-linecap="round"/></g></g></g>
+  <g filter="url(#dim)"><g transform="rotate(38 60 74)"><path d="M60 74V88" stroke="#e2d8c8" stroke-width="7.5" stroke-linecap="round"/><g transform="rotate(70 60 88)"><path d="M60 88V99" stroke="#b07a55" stroke-width="5.5" stroke-linecap="round"/><ellipse cx="63" cy="100.5" rx="5" ry="2.6" fill="#a07a5c"/></g></g></g>
+  <rect x="51.5" y="45" width="17" height="31" rx="7" fill="#e6d6bb" stroke="#2a2722" stroke-width="1.6"/>
+  <path d="M52 66h16" stroke="#b07a55" stroke-width="2.4"/>
+  <circle cx="62" cy="36" r="8.5" fill="#d6a47a" stroke="#2a2722" stroke-width="1.6"/>
+  <path d="M53.4 35a8.6 8.6 0 0 1 17.2 0z" fill="#7d9472" stroke="#2a2722" stroke-width="1.2" stroke-linejoin="round"/>
+  <path d="M69.5 33.6h7.8a1.6 1.6 0 0 1 0 3.2h-7.8z" fill="#7d9472" stroke="#2a2722" stroke-width="1.2" stroke-linejoin="round"/>
+  <g transform="rotate(-40 60 74)"><path d="M60 74V88" stroke="#e2d8c8" stroke-width="7.5" stroke-linecap="round"/><g transform="rotate(14 60 88)"><path d="M60 88V99" stroke="#b07a55" stroke-width="5.5" stroke-linecap="round"/><ellipse cx="63" cy="100.5" rx="5" ry="2.6" fill="#a07a5c"/></g></g>
+  <g transform="rotate(46 60 52)"><path d="M60 52V63" stroke="#e6d6bb" stroke-width="6" stroke-linecap="round"/><g transform="rotate(-80 60 63)"><path d="M60 63V72" stroke="#d6a47a" stroke-width="4.6" stroke-linecap="round"/></g></g>
+</g></g>
+</svg>

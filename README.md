@@ -16,7 +16,7 @@ A private, ad-free speed test you install on your iPhone or Mac home screen. It'
 
 - **Test servers:** Cloudflare's free public speed-test endpoints (`speed.cloudflare.com`).
 - **Downdetector:** direct reachability checks from your own network, public Statuspage APIs, and links to Downdetector's website.
-- **Widgets:** the last download speed shows as a badge on the app icon, and a one-tap `?go=1` link works with the Shortcuts app.
+- **Widgets:** the last download speed shows as a badge on the app icon. Speedy never starts a test on its own; tap Run.
 - **Wi-Fi vs cellular detection:** guessed from your provider's name, with a manual switch.
 - **Outage log:** logs drops while Speedy is open. Leave it open on a Mac or a spare phone to log around the clock.
 

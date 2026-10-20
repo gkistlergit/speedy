@@ -14,7 +14,6 @@
     { "src": "icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
-    { "name": "Run a speed test", "short_name": "Test now", "url": "./?go=1", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
     { "name": "Video test", "url": "./#video" },
     { "name": "Service status", "url": "./#status" }
   ]
