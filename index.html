@@ -5,10 +5,11 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Speedy</title>
 <meta name="description" content="Private speed test: download, upload, lag under load, video quality, service status and Wi-Fi dead spots.">
-<meta name="theme-color" content="#0b0d1a">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f3efe8">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#191714">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Speedy">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
@@ -16,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://speed.cloudflare.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Sora:wght@300;400;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&display=swap">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -25,7 +26,7 @@
     <span class="top-side"></span>
     <div class="brand" aria-label="Speedy">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.6 17.5a9 9 0 1 1 14.8 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M12 13.2l4.2-4.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-      SPEEDY
+      Speedy
     </div>
     <button class="icon-btn top-side" id="menuBtn" aria-label="Settings">
       <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
@@ -48,7 +49,7 @@
         </div>
 
         <div class="idle-view" id="idleView">
-          <button class="go" id="goBtn" aria-label="Start speed test"><span>GO</span></button>
+          <button class="go" id="goBtn" aria-label="Start speed test"><span>Go</span></button>
           <p class="hint" id="lastHint"></p>
         </div>
 
