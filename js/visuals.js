@@ -341,7 +341,8 @@ export function createRunner(svg) {
   const farArm = makeArm(farG), farLeg = makeLeg(farG);
   const torso = part(body, 'shirt'), pelvis = part(body, 'shorts');
   const nearLeg = makeLeg(el('g', 'near', body));
-  const neck = part(body, 'skin'), head = part(body, 'skin'), hair = part(body, 'hair'), ear = part(body, 'ear');
+  const neck = part(body, 'skin'), head = part(body, 'skin'), hair = part(body, 'hair');
+  const helmet = part(body, 'helmet'), brim = part(body, 'helmet'), earHole = part(body, 'ear-hole'), shine = part(body, 'shine');
   const nearArm = makeArm(el('g', 'near', body));
 
   // Leg pose with the hip at the origin; the foot is drawn in its own frame
@@ -405,7 +406,12 @@ export function createRunner(svg) {
     const tilt = -(lean - 4), H = (pts) => pts.map((pt) => rot(nt, tilt, pt));
     head.setAttribute('d', outline(H([[-4.4, -4.6], [-3.6, -8.4], [0, -10.4], [3.6, -9.2], [4.6, -6.6], [4.9, -5.2], [6.0, -3.6], [4.9, -3.0], [5.0, -2.0], [4.2, -0.6], [2.4, 0.2], [0.4, -0.2], [-2.2, -0.6], [-4.3, -2.2]])));
     hair.setAttribute('d', outline(H([[-4.9, -3.4], [-4.8, -6.6], [-2.6, -9.9], [0.6, -11.0], [3.6, -9.8], [4.7, -7.6], [3.4, -8.0], [1.0, -7.6], [-0.4, -6.4], [-1.6, -4.4], [-3.0, -2.6]])));
-    ear.setAttribute('d', outline(H([[-1.2, -5.6], [0.2, -5.4], [0.4, -3.6], [-0.6, -2.6], [-1.4, -3.6]])));
+    // Batting helmet: hard shell with an ear flap over the near ear, a short bill and a glossy highlight.
+    helmet.setAttribute('d', outline(H([[-5.0, -2.6], [-5.5, -5.8], [-4.4, -9.0], [-1.9, -11.0], [1.2, -11.4], [3.9, -10.3], [5.0, -8.5], [4.9, -7.3], [3.2, -7.1],
+      [2.6, -5.8], [2.4, -3.6], [1.5, -1.9], [-0.5, -1.5], [-2.2, -2.0], [-3.4, -2.7]])));
+    brim.setAttribute('d', outline(H([[4.4, -8.3], [6.6, -8.1], [8.2, -7.4], [7.6, -6.8], [5.6, -6.8], [4.4, -7.0]])));
+    earHole.setAttribute('d', outline(H([[-0.9, -5.2], [0.4, -5.0], [0.6, -3.7], [-0.4, -3.2], [-1.2, -4.1]])));
+    shine.setAttribute('d', outline(H([[-3.4, -8.4], [-1.5, -10.2], [1.3, -10.6], [3.0, -9.9], [1.1, -9.8], [-1.1, -9.3], [-2.8, -7.8]])));
 
     drawArm(farArm, along(sh, 90 - lean, -0.6), shoulder(p + 0.5), elbow(p + 0.5));
     drawArm(nearArm, along(sh, 90 - lean, 0.6), shoulder(p), elbow(p));

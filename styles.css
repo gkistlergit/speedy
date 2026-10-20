@@ -78,12 +78,14 @@ main { flex: 1; min-height: 0; position: relative; overflow: hidden; }
 .go::after { content: ''; position: absolute; inset: -14px; border-radius: 50%; z-index: -1; border: 1px solid var(--down); opacity: 0.35; animation: breathe 3.6s ease-in-out infinite; }
 /* runner: a side-view runner, posed each frame from running-gait joint angles (js/visuals.js) */
 .runner { width: 68%; height: auto; aspect-ratio: 1; margin: -10% 0 -8%; overflow: visible;
-  --skin: #c08a64; --skin-far: #a3714f; --hair: #1d2433; --shirt: #2563eb; --shirt-far: #1d4fc4; --shorts: #1d2433; --sock: #ffffff; --shoe: #7c3aed; --sole: #eceef2; }
-@media (prefers-color-scheme: dark) { .runner { --skin: #c99470; --skin-far: #a2765a; --hair: #05060a; --shirt: #4d8dff; --shirt-far: #3a72d6; --shorts: #3a4252; --sock: #f2f4f7; --shoe: #a78bfa; --sole: #f2f4f7; } }
+  --skin: #c08a64; --skin-far: #a3714f; --hair: #1d2433; --shirt: #2563eb; --shirt-far: #1d4fc4; --shorts: #1d2433; --sock: #ffffff; --shoe: #7c3aed; --sole: #eceef2; --helmet: #1d2433; }
+@media (prefers-color-scheme: dark) { .runner { --skin: #c99470; --skin-far: #a2765a; --hair: #05060a; --shirt: #4d8dff; --shirt-far: #3a72d6; --shorts: #3a4252; --sock: #f2f4f7; --shoe: #a78bfa; --sole: #f2f4f7; --helmet: #2b3445; } }
 .runner .ground { fill: none; stroke: var(--line-strong); stroke-width: 1.6; stroke-linecap: round; stroke-dasharray: 7 9; }
 .runner .shadow { fill: var(--fg); opacity: 0.08; }
 .runner .skin { fill: var(--skin); }
-.runner .ear { fill: var(--skin-far); }
+.runner .helmet { fill: var(--helmet); }
+.runner .ear-hole { fill: var(--skin-far); }
+.runner .shine { fill: #ffffff; opacity: 0.28; }
 .runner .hair { fill: var(--hair); }
 .runner .shirt { fill: var(--shirt); }
 .runner .shorts { fill: var(--shorts); }
