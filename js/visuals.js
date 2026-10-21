@@ -4,8 +4,10 @@ export const cssVar = (name) => getComputedStyle(document.documentElement).getPr
 // ---------- Particle swirl (video test backdrop) ----------
 // A 3D vortex filmed by a slowly orbiting camera: comets spiral down a thick,
 // funnelled disc into a glowing core, circled by a tilted accretion ring whose
-// near side crosses in front of the core. Real perspective, fog, soft near
-// particles and foreground bokeh sell the depth. Speed follows the throughput.
+// near side crosses in front of the core. The disc reaches out past the edges of
+// the screen and thins away gradually toward its rim. Real perspective, fog, soft
+// near particles and foreground bokeh sell the depth. Speed follows the throughput;
+// a finished test swells the light up, holds it, then lets it fade slowly.
 // Cheap per frame: backdrop and vignette+grain are pre-rendered, glows are
 // sprites, and comets are batched into one stroke per (depth side, width,
 // alpha, colour) bucket, drawn far to near.
@@ -13,7 +15,7 @@ export function createSwirl(canvas) {
   const ctx = canvas.getContext('2d');
   const PALETTE = [[77, 141, 255], [124, 58, 237], [56, 189, 248], [167, 139, 250], [37, 99, 235], [226, 232, 240], [99, 102, 241], [148, 163, 184]];
   const CORE = [226, 236, 255];
-  const RO = 2.6, YC = -0.5, FC = 0.3, RING = 0.42, BODY = 0.15, DIST = 2.7, EL = 0.85, TAU = Math.PI * 2; // world units
+  const RO = 4.2, YC = -0.5, FC = 0.3, RING = 0.42, BODY = 0.15, DIST = 2.7, EL = 0.85, TAU = Math.PI * 2; // world units
   const NW = 16, NA = 16, W0 = 0.45, A0 = 0.028, WS = 1.4, AS = 1.4, IW = 1 / Math.log(WS), IA = 1 / Math.log(AS);
   const WL = Array.from({ length: NW }, (_, i) => W0 * WS ** i), AL = Array.from({ length: NA }, (_, i) => Math.min(1, A0 * AS ** i));
   const mix = (c, d, f) => `rgb(${c.map((v, i) => Math.round(v + (d[i] - v) * f))})`;
@@ -22,7 +24,7 @@ export function createSwirl(canvas) {
   const HOT = [8, 9, 10, 9, 8, 10, 9, 8], SPARK = COLS.length - 1;
   const smooth = (e0, e1, x) => { const k = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return k * k * (3 - 2 * k); };
   const clamp = (x, a = -1, b = 1) => Math.max(a, Math.min(b, x));
-  const funnel = (r, h) => (YC * FC) / (r + FC) + 0.05 * r * r + h * (0.03 + 0.1 * r); // a bowl that sinks into a throat at the core, thicker outside
+  const funnel = (r, h) => { const q = r * 2.6 / RO; return (YC * FC) / (r + FC) + 0.05 * q * q + h * (0.03 + 0.1 * q); }; // a bowl that sinks into a throat at the core, thicker outside
   const layer = (w, h) => { const c = document.createElement('canvas'); c.width = Math.max(1, Math.ceil(w)); c.height = Math.max(1, Math.ceil(h)); return [c, c.getContext('2d')]; };
   function sprite(size, stops) {
     const [c, g] = layer(size, size), gr = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
@@ -32,11 +34,12 @@ export function createSwirl(canvas) {
   const HALO = sprite(128, [[0, 'rgba(226,236,255,0.9)'], [0.12, 'rgba(170,180,255,0.5)'], [0.4, 'rgba(99,102,241,0.16)'], [1, 'rgba(99,102,241,0)']]);
   const BODYS = sprite(128, [[0, 'rgba(250,252,255,1)'], [0.35, 'rgba(214,222,255,1)'], [0.7, 'rgba(140,146,236,0.9)'], [0.88, 'rgba(84,80,190,0.5)'], [1, 'rgba(60,50,160,0)']]);
   const BOKEH = PALETTE.map((c) => sprite(64, [[0, `rgba(${c},0.55)`], [0.72, `rgba(${c},0.7)`], [0.86, `rgba(${c},0.45)`], [1, `rgba(${c},0)`]]));
-  let W = 0, H = 0, F = 0, M = 0, parts = [], ring = [], bokeh = [], raf = 0, intensity = 0.35, target = 0.35, t = 0, ct = 0, flare = 0, last = 0;
+  let W = 0, H = 0, F = 0, M = 0, parts = [], ring = [], bokeh = [], raf = 0, intensity = 0.35, target = 0.35, t = 0, ct = 0, flare = 0, flareAt = null, last = 0;
   let back = null, over = null, keys = new Uint32Array(0), P = new Float32Array(0), px = 0, py = 0, pz = 0;
   const band = new Float32Array(49 * 3), tilt = { x: 0, y: 0, tx: 0, ty: 0, b0: null };
   function spawn(p, anywhere) {
-    p.r = RO * Math.sqrt(anywhere ? Math.random() * 1.1 : 0.2 + Math.random() * 0.9); p.f = anywhere ? 1 : 0;
+    // most comets appear in the inner disc and fade in; fewer out toward the rim, so the middle stays dense
+    p.r = RO * (anywhere ? Math.random() ** 0.85 : 0.22 + 0.8 * Math.random() ** 1.5); p.f = anywhere ? 1 : 0;
     p.a = Math.random() * TAU; p.h = Math.random() + Math.random() - 1;
     p.w = (0.35 + Math.random()) * 0.008; p.v = 0.7 + Math.random() * 0.6;
     p.c = (Math.random() * PALETTE.length) | 0; p.s = 0.4 + Math.random() * 1.4; p.b = Math.random();
@@ -73,7 +76,7 @@ export function createSwirl(canvas) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (!W || !H) return;
     F = Math.max(W * 1.1, H * 0.6); M = Math.round(Math.max(W, H) * 0.12);
-    const n = Math.round(Math.min(1000, (W * H) / 360)), nr = Math.round(n * 0.12);
+    const n = Math.round(Math.min(1400, (W * H) / 260)), nr = Math.round(n * 0.1); // n + nr must stay under 2048 (sort key index bits)
     parts = Array.from({ length: n }, () => spawn({}, true));
     ring = Array.from({ length: nr }, () => ({ a: Math.random() * TAU, r: RING * (0.85 + Math.random() * 0.35), h: (Math.random() - 0.5) * 0.04, w: 0.012 + Math.random() * 0.01, c: [0, 2, 3, 5][(Math.random() * 4) | 0], s: 0.5 + Math.random(), b: Math.random(), tw: Math.random() * TAU, spark: Math.random() < 0.3 }));
     bokeh = Array.from({ length: 18 }, () => ({ r: 0.5 + Math.random() * 2.2, a: Math.random() * TAU, y: -0.4 + Math.random() * 1.6, w: 0.0006 + Math.random() * 0.0012, size: 0.05 + Math.random() * 0.1, c: (Math.random() * PALETTE.length) | 0 }));
@@ -89,7 +92,12 @@ export function createSwirl(canvas) {
     const k = last ? Math.min(3, (now - last) / 16.667) : 1; last = now;
     t += (0.004 + intensity * 0.01) * k; ct += k / 60;
     intensity += (target - intensity) * 0.03 * k;
-    flare *= Math.pow(0.965, k);
+    // the finish: light swells up over about a second, holds, then fades over several seconds
+    if (flareAt !== null) {
+      const s = ct - flareAt;
+      flare = 1.7 * (s < 0.9 ? smooth(0, 0.9, s) : s < 1.9 ? 1 : Math.exp(-(s - 1.9) / 1.8));
+      if (s > 12) { flare = 0; flareAt = null; }
+    }
     tilt.x += (tilt.tx - tilt.x) * 0.05 * k; tilt.y += (tilt.ty - tilt.y) * 0.05 * k;
     if (!W || !H) { if (raf) raf = requestAnimationFrame(frame); return; }
 
@@ -126,7 +134,7 @@ export function createSwirl(canvas) {
     };
     // depth cues: perspective size, fog toward the far side, near particles soft (wider and fainter)
     const look = (i, p, front, rel, lw, al, col, near) => {
-      al *= Math.min(1.2, rel * rel) * smooth(0.2, 0.7, near);
+      al *= Math.min(1.2, rel * rel) * smooth(0.2, 0.7, near) * (1 + 0.5 * flare);
       const soft = Math.max(0, rel - 1.6) * 1.3; if (soft) { lw *= 1 + soft; al /= (1 + soft) ** 1.5; }
       if (soft || lw < 0.7) emit(i, front, lw, al * 0.7, col, 0); // out of focus or tiny: one stroke will do
       else { emit(i, front, lw, al * 0.45, col, 0); emit(i, front, lw * 1.15, al, col, 1); } // tapered: faint tail, brighter head
@@ -137,7 +145,7 @@ export function createSwirl(canvas) {
       const da = p.w * spin * (1 + 0.25 / (p.r + 0.12)), dr = pull * (0.3 + (p.r / RO) * 0.9) * p.v * 0.0016 * RO;
       p.a += da * k; p.r -= dr * k; p.f = Math.min(1, p.f + 0.02 * k);
       if (p.r < 0.02) { spawn(p, false); continue; }
-      const fade = smooth(0.02, 0.22, p.r) * smooth(RO * 1.1, RO * 0.85, p.r) * p.f; if (fade < 0.01) continue;
+      const fade = smooth(0.02, 0.22, p.r) * smooth(RO * 1.02, RO * 0.3, p.r) ** 1.3 * p.f; if (fade < 0.01) continue; // thins away toward the rim
       const a1 = p.a - da * trail * 0.5, r1 = p.r + dr * trail * 0.5, a2 = p.a - da * trail, r2 = p.r + dr * trail;
       if (!put(i * 6, Math.cos(a2) * r2, funnel(r2, p.h), Math.sin(a2) * r2, Math.cos(a1) * r1, funnel(r1, p.h), Math.sin(a1) * r1, Math.cos(p.a) * p.r, funnel(p.r, p.h), Math.sin(p.a) * p.r)) continue;
       const rel = DIST / pz, heat = 1 - smooth(0, 0.6, p.r); // brightens to white near the core
@@ -209,6 +217,7 @@ export function createSwirl(canvas) {
     ctx.globalCompositeOperation = 'lighter';
     glow(HALO, ks * BODY * (2.4 + intensity + flare * 2), (0.22 + intensity * 0.25 + flare * 0.5) * pulse);
     glow(HALO, ks * BODY * 0.8, 0.4 * pulse + flare * 0.5);
+    if (flare > 0.01) glow(HALO, ks * (1.4 + 2.6 * flare), 0.2 * flare); // the finish washes light over the whole scene
     // near half of the ring: a dusty lane across the core, then its bright edge
     ringBand(true);
     ctx.globalCompositeOperation = 'source-over'; ctx.strokeStyle = 'rgb(10,12,26)'; ctx.lineWidth = bw * 2.6; ctx.globalAlpha = 0.5; ctx.stroke();
@@ -232,7 +241,7 @@ export function createSwirl(canvas) {
     },
     stop() { cancelAnimationFrame(raf); raf = 0; ro.disconnect(); removeEventListener('deviceorientation', onTilt); },
     set(v) { target = Math.max(0, Math.min(1, v)); },
-    burst() { flare = 1; },
+    burst() { flareAt = ct; },
   };
 }
 
