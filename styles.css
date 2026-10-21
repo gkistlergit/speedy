@@ -80,58 +80,15 @@ main { flex: 1; min-height: 0; position: relative; overflow: hidden; }
   color: var(--on-accent); background: var(--accent); padding: 13px 34px 14px; border-radius: 999px; box-shadow: 0 4px 18px rgba(11, 42, 63, 0.3); transition: background 0.2s, transform 0.2s; }
 .go:hover { background: var(--accent-hover); }
 .go::after { content: ''; position: absolute; inset: -7px; border-radius: 999px; z-index: -1; border: 2px solid #ffffff; opacity: 0.5; animation: breathe 3.6s ease-in-out infinite; }
-/* runner: a side-view runner, posed each frame from running-gait joint angles (js/visuals.js),
-   in a cream alternate-style baseball uniform with red trim */
-.runner { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0;
-  --skin: #c08a64; --skin-far: #a3714f; --hair: #1d2433; --cream: #f2ead6; --cream-far: #ddd2b9; --red: #c41e3a; --red-far: #a3182f;
-  --navy: #0c2340; --sole: #16181d; --spike: #a4abb8; --seam: rgba(16, 24, 40, 0.18); }
-@media (prefers-color-scheme: dark) { .runner { --skin: #c99470; --skin-far: #a2765a; --hair: #05060a; --cream: #eee5cf; --cream-far: #cfc3a8; --navy: #26406b; --seam: transparent; } }
-.runner .shadow { fill: #3a2414; opacity: 0.22; }
-.runner .skin { fill: var(--skin); }
-.runner .hair { fill: var(--hair); }
-.runner .cream { fill: var(--cream); stroke: var(--seam); stroke-width: 0.35; }
-.runner .red { fill: var(--red); }
-.runner .piping { fill: none; stroke: var(--red); stroke-width: 0.55; stroke-linecap: round; stroke-linejoin: round; }
-.runner .glove { fill: var(--navy); }
-.runner .sole { fill: var(--sole); }
-.runner .spikes { fill: var(--spike); }
-.runner .ear-hole { fill: var(--skin-far); }
-.runner .shine { fill: #ffffff; opacity: 0.3; }
-.runner .far .skin { fill: var(--skin-far); }
-.runner .far .cream { fill: var(--cream-far); }
-.runner .far .red { fill: var(--red-far); }
-.runner .far .piping { stroke: var(--red-far); }
-.runner .far { filter: brightness(0.92); }
-
-/* ballpark behind the runner: day game in light mode, night game in dark */
-.runner { --sky-top: #8fcdf2; --sky-low: #dff1fb; --facade: #0c2340; --stands: #c3c9d3; --seats: #9e1b2f; --wall: #1f4d33; --wall-cap: #f2c230;
+/* runner and ballpark: drawn on stacked canvases (js/visuals.js), coloured from these custom properties.
+   Uniform: a cream alternate-style baseball uniform with red trim. */
+.runner { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none;
+  --skin: #c08a64; --hair: #1d2433; --cream: #f2ead6; --red: #c41e3a; --navy: #0c2340; --sole: #16181d; --spike: #a4abb8; --seam: rgba(16, 24, 40, 0.18);
+  --sky-top: #8fcdf2; --sky-low: #dff1fb; --facade: #0c2340; --stands: #c3c9d3; --seats: #9e1b2f; --wall: #1f4d33; --wall-cap: #f2c230;
   --grass: #5aa548; --track: #b88356; --dirt: #c9915f; --pebble: #b07a4b; --chalk: #ffffff; --bag: #ffffff; --bag-top: #f3f4f6; --haze: rgba(226, 242, 252, 0.4); --lights: 0; }
-@media (prefers-color-scheme: dark) { .runner { --sky-top: #050b18; --sky-low: #16264a; --stands: #222a3b; --seats: #6d1424; --wall: #143424;
+@media (prefers-color-scheme: dark) { .runner { --skin: #c99470; --hair: #05060a; --cream: #eee5cf; --navy: #26406b; --seam: transparent;
+  --sky-top: #050b18; --sky-low: #16264a; --stands: #222a3b; --seats: #6d1424; --wall: #143424;
   --grass: #2f7330; --track: #7c5638; --dirt: #8f6342; --pebble: #7a5236; --chalk: #e9eef5; --bag: #eef2f7; --bag-top: #dfe5ee; --haze: rgba(8, 15, 32, 0.45); --lights: 1; } }
-.runner .sky-top { stop-color: var(--sky-top); } .runner .sky-low { stop-color: var(--sky-low); }
-.runner .lights { opacity: var(--lights); }
-.runner .glow-in { stop-color: #fff6d8; stop-opacity: 0.55; } .runner .glow-out { stop-color: #fff6d8; stop-opacity: 0; }
-.runner .bulbs { fill: #fffbe8; } .runner .bulb-lines { stroke: #c9c2a3; stroke-width: 0.35; }
-.runner .facade { fill: var(--facade); } .runner .trim { fill: #ffffff; opacity: 0.8; }
-.runner .stands { fill: var(--stands); } .runner .seats { fill: var(--seats); }
-.runner .haze { fill: var(--haze); }
-.runner .fan { animation: cheer 0.6s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate; }
-.runner .arm path { fill: none; stroke-width: 1.5; stroke-linecap: round; }
-.runner .arm.l { transform-origin: -2.3px -5.2px; animation: wave-l 0.8s ease-in-out infinite alternate; }
-.runner .arm.r { transform-origin: 2.3px -5.2px; animation: wave-r 0.8s ease-in-out infinite alternate; }
-.runner .clap .arm { animation-name: clap; }
-.runner .one .arm.l { animation: none; }
-.runner .eye, .runner .mouth { fill: #1d1d1f; }
-.runner .wall { fill: var(--wall); } .runner .wall-cap { fill: var(--wall-cap); }
-.runner .grass { fill: var(--grass); } .runner .track { fill: var(--track); opacity: 0.55; }
-.runner .dirt { fill: var(--dirt); } .runner .pebble { fill: var(--pebble); }
-.runner .chalk { fill: var(--chalk); opacity: 0.9; }
-.runner .bag { fill: var(--bag); } .runner .bag-top { fill: var(--bag-top); } .runner .base-shadow { fill: #3a2414; opacity: 0.25; }
-.runner .park * { transform-box: view-box; }
-@keyframes cheer { from { transform: translateY(0.4px) scaleY(0.97); } to { transform: translateY(-3.4px) scaleY(1.02); } }
-@keyframes wave-l { from { transform: rotate(14deg); } to { transform: rotate(-16deg); } }
-@keyframes wave-r { from { transform: rotate(-14deg); } to { transform: rotate(16deg); } }
-@keyframes clap { from { transform: scaleX(1); } to { transform: scaleX(0.7); } }
 .go:active { transform: translateX(-50%) scale(0.97); }
 @keyframes breathe { 50% { opacity: 0.08; transform: scale(1.05); } }
 
@@ -358,6 +315,6 @@ main { flex: 1; min-height: 0; position: relative; overflow: hidden; }
   .info-sheet { max-width: 640px; margin: 0 auto; width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .go::after, .pulse, .runner .fan, .runner .arm { animation: none !important; }
+  .go::after, .pulse { animation: none !important; }
   .sheet { animation: none; }
 }
