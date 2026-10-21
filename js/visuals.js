@@ -859,7 +859,7 @@ function createBallpark(root, stage, onRebuild) {
     place(crowd, CROWD[0], CROWD[1], 0.75, r.width); // below screen resolution: the stands sit out of focus
     place(action, ACTION[0], ACTION[1], dpr, r.width);
     const bottom = y0 + r.height / u;
-    place(tint, y0, bottom, 0.5, r.width); place(fx, y0, bottom, 0.6, r.width); // soft by nature, so drawn below screen resolution
+    place(tint, y0, bottom, 0.25, r.width); place(fx, y0, bottom, 0.4, r.width); // soft by nature, so drawn below screen resolution
     const cs = getComputedStyle(root), v = (n) => cs.getPropertyValue(n).trim();
     C = { skyTop: v('--sky-top'), skyLow: v('--sky-low'), facade: v('--facade'), stands: v('--stands'), seats: v('--seats'), wall: v('--wall'), wallCap: v('--wall-cap'),
       grass: v('--grass'), track: v('--track'), dirt: v('--dirt'), pebble: v('--pebble'), chalk: v('--chalk'), bag: v('--bag'), bagTop: v('--bag-top'), haze: v('--haze'), dust: v('--dust'), scuff: v('--scuff'), lights: v('--lights') === '1',
@@ -1001,9 +1001,9 @@ function createBallpark(root, stage, onRebuild) {
   function bubble(x, y, n, t, spread = 1) {
     for (let i = 0; i < n; i++) bubbles.push({ x: x + (rnd() - 0.5) * spread, y: y + (rnd() - 0.5) * spread, r: 0.45 + rnd() * 0.75, vy: 5 + rnd() * 6, ph: rnd() * 6.3, born: t + i * 0.04, d0: null });
   }
-  // The water layer, redrawn up to 40 times a second: light rays, caustics on the field, marine snow, fish and bubbles.
+  // The water layer, redrawn up to 30 times a second: light rays, caustics on the field, marine snow, fish and bubbles.
   function water(d, t) {
-    if (Math.abs(t - fxAt) < 0.025) return;
+    if (Math.abs(t - fxAt) < 0.033) return;
     const dt = Math.min(0.1, Math.max(0, t - fxAt)); fxAt = t;
     const g = fx.g, bottom = fx.top + fx.c.height / fx.k;
     g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, fx.c.width, fx.c.height);
