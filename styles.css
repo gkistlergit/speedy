@@ -80,15 +80,17 @@ main { flex: 1; min-height: 0; position: relative; overflow: hidden; }
   color: var(--on-accent); background: var(--accent); padding: 13px 34px 14px; border-radius: 999px; box-shadow: 0 4px 18px rgba(11, 42, 63, 0.3); transition: background 0.2s, transform 0.2s; }
 .go:hover { background: var(--accent-hover); }
 .go::after { content: ''; position: absolute; inset: -7px; border-radius: 999px; z-index: -1; border: 2px solid #ffffff; opacity: 0.5; animation: breathe 3.6s ease-in-out infinite; }
-/* runner and ballpark: drawn on stacked canvases (js/visuals.js), coloured from these custom properties.
+/* swimmer and ballpark, under water: drawn on stacked canvases (js/visuals.js), coloured from these custom properties.
    Uniform: a cream alternate-style baseball uniform with cardinal red (#c41e3a) accents. */
 .runner { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none;
-  --skin: #c08a64; --hair: #1d2433; --cream: #f4e6c6; --cream-far: #d6c29c; --red: #c41e3a; --glove: #c41e3a; --sole: #16181d; --spike: #a4abb8; --outline: #161a24; --dust: #efe6d4; --scuff: rgba(120, 84, 52, 0.55);
-  --sky-top: #8fcdf2; --sky-low: #dff1fb; --facade: #0c2340; --stands: #c3c9d3; --seats: #9e1b2f; --wall: #1f4d33; --wall-cap: #f2c230;
-  --grass: #5aa548; --track: #b88356; --dirt: #c9915f; --pebble: #b07a4b; --chalk: #ffffff; --bag: #ffffff; --bag-top: #f3f4f6; --haze: rgba(226, 242, 252, 0.52); --lights: 0; }
+  --skin: #c08a64; --hair: #1d2433; --cream: #f4e6c6; --cream-far: #d6c29c; --red: #c41e3a; --glove: #c41e3a; --sole: #16181d; --spike: #a4abb8; --outline: #161a24; --dust: #efe6d4;
+  --sky-top: #8fe3f5; --sky-low: #3aa6c8; --facade: #0c2340; --stands: #c3c9d3; --seats: #9e1b2f; --wall: #1f4d33; --wall-cap: #f2c230;
+  --grass: #5aa548; --track: #b88356; --dirt: #c9915f; --pebble: #b07a4b; --chalk: #ffffff; --bag: #ffffff; --haze: rgba(150, 215, 232, 0.5); --lights: 0;
+  --water-top: rgba(120, 225, 245, 0.18); --water-mid: rgba(0, 120, 165, 0.22); --water-deep: rgba(0, 60, 100, 0.4); --fish: #0d4a63; --tether: rgba(240, 236, 220, 0.8); --anchor: #4a5561; }
 @media (prefers-color-scheme: dark) { .runner { --skin: #c99470; --hair: #05060a; --cream: #f1e3c2; --cream-far: #cdb993; --outline: #06080c; --dust: #d9cdb6;
-  --sky-top: #050b18; --sky-low: #16264a; --stands: #222a3b; --seats: #6d1424; --wall: #143424;
-  --grass: #2f7330; --track: #7c5638; --dirt: #8f6342; --pebble: #7a5236; --chalk: #e9eef5; --bag: #eef2f7; --bag-top: #dfe5ee; --haze: rgba(8, 15, 32, 0.55); --lights: 1; } }
+  --sky-top: #0a4a66; --sky-low: #062638; --stands: #222a3b; --seats: #6d1424; --wall: #143424;
+  --grass: #2f7330; --track: #7c5638; --dirt: #8f6342; --pebble: #7a5236; --chalk: #e9eef5; --bag: #eef2f7; --haze: rgba(4, 30, 48, 0.55); --lights: 1;
+  --water-top: rgba(40, 170, 210, 0.18); --water-mid: rgba(0, 70, 110, 0.32); --water-deep: rgba(0, 25, 50, 0.5); --fish: #02141f; --tether: rgba(220, 225, 215, 0.7); --anchor: #2b333d; } }
 .go:active { transform: translateX(-50%) scale(0.97); }
 .go.leaving { opacity: 0; transform: translateX(-50%) scale(0.9); pointer-events: none; transition: opacity 0.25s, transform 0.25s; }
 @keyframes breathe { 50% { opacity: 0.08; transform: scale(1.05); } }
