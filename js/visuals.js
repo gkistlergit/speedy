@@ -312,7 +312,7 @@ export function sparkline(canvas, values, color) {
 // Speed tab: as one SVG the whole scene was redrawn on every change, which ran
 // at ~4 fps on iPhone; here only the runner, the crowd's bounce and the dirt move.
 export function createRunner(root, stage = root) {
-  const CYCLE = 0.54;                         // seconds per stride (two steps), ~220 steps/min: running out a hit
+  const CYCLE = 0.675;                        // seconds per stride (two steps), ~178 steps/min
   const GROUND = 104, HIP_X = 57, LEAN = 11;  // lean in degrees, top tilted forward
   const L = { thigh: 19.5, shin: 19, torso: 22.5, neck: 3.2, upper: 13.5, fore: 12 };
   const STANCE = 0.34;                        // fraction of the cycle a foot is on the ground
@@ -476,15 +476,22 @@ export function createRunner(root, stage = root) {
     C = { skin: v('--skin'), hair: v('--hair'), cream: v('--cream'), red: v('--red'), glove: v('--navy'), sole: v('--sole'), spike: v('--spike'), seam: v('--seam'), shine: 'rgba(255,255,255,0.3)' };
     C.far = {};
     for (const k in C) C.far[k] = /^#[0-9a-f]{6}$/i.test(C[k]) ? shade(C[k], 0.74) : C[k];
+    C.outline = v('--outline');
   }
+  // A dark outline around the whole silhouette makes him pop off the crowd and the grass:
+  // every shape is stroked first, then filled over, so only the outer edge survives.
   function render(ctx) {
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    for (const op of ops) if (typeof op[1] === 'string') op.path = new Path2D(op[1]);
+    const all = new Path2D();
+    for (const op of ops) if (op.path && !op[3] && op[0] !== 'shine') all.addPath(op.path);
+    ctx.strokeStyle = C.outline; ctx.lineWidth = 1.6; ctx.stroke(all);
     for (const op of ops) {
       if (op[0] === 'shadow') { ctx.fillStyle = 'rgba(40,24,12,0.24)'; ctx.beginPath(); ctx.ellipse(HIP_X + 2, GROUND + 0.8, op[1], 1.8, 0, 0, 2 * Math.PI); ctx.fill(); continue; }
       if (op[0] === 'spike') {
         const g = op[1]; ctx.save(); ctx.translate(g.a[0], g.a[1]); ctx.rotate(rad(g.foot)); ctx.fillStyle = C.spike; ctx.fill(SPIKES); ctx.restore(); continue;
       }
-      const [key, d, far, w] = op, path = new Path2D(d), col = (far ? C.far : C)[key];
+      const [key, , far, w] = op, path = op.path, col = (far ? C.far : C)[key];
       if (w) { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.stroke(path); continue; }
       ctx.fillStyle = col; ctx.fill(path);
       if (key === 'cream' && C.seam !== 'transparent') { ctx.strokeStyle = C.seam; ctx.lineWidth = 0.35; ctx.stroke(path); }
@@ -493,14 +500,24 @@ export function createRunner(root, stage = root) {
 
   const K = 0.6; // the runner's own 120-unit frame, scaled down onto the base path
   const park = createBallpark(root, stage, () => { colours(); draw(lastT); });
-  let raf = 0, t0 = 0, lastT = 0;
+  // Bases are timed to his steps: one comes by every few strides and a foot lands right on it
+  // (the near foot strikes at whole cycles, the far foot at half cycles; ground moves `step` per strike).
+  const step = speed * K * CYCLE / 2, ox = park.runX - HIP_X * K;
+  const strikeX = ox + (legPose(0, [HIP_X + 0.9 * twist(0), 0]).a[0] + 2) * K; // middle of the planted cleat
+  let raf = 0, t0 = 0, lastT = 0, lastBase = -1;
   function draw(t) {
     lastT = t;
-    const ctx = park.draw(t * speed * K, t);
+    const d = t * speed * K, span = park.span(), G = Math.ceil((span[1] - span[0] + 24) / step) * step;
+    const A = span[1] + 8 - strikeX, bx = strikeX + A - (((d + A) % G) + G) % G;
+    const n = Math.floor(d / G);
+    if (n !== lastBase && lastBase !== -1 && raf) park.dust(strikeX, t); // the cleat hits the bag
+    lastBase = n;
+    const ctx = park.draw(d, t, bx);
     if (!ctx) return;
-    pose(t / CYCLE + 0.015 * Math.sin(t * 0.83)); // a slight drift in rhythm, so no two strides are identical
-    ctx.translate(park.runX - HIP_X * K, park.path - GROUND * K); ctx.scale(K, K);
-    render(ctx);
+    pose(t / CYCLE);
+    ctx.save(); ctx.translate(ox, park.path - GROUND * K); ctx.scale(K, K);
+    render(ctx); ctx.restore();
+    park.front(ctx, d, t);
   }
   function frame(now) {
     raf = requestAnimationFrame(frame);
@@ -527,7 +544,7 @@ export function createRunner(root, stage = root) {
 // shallow depth of field) from one pre-rendered sprite per fan; and a strip
 // holding the base path and the runner is redrawn at full sharpness.
 function createBallpark(root, stage, onRebuild) {
-  const PATH = 86, BASE_GAP = 210, TILE = 24;
+  const PATH = 86, TILE = 24;
   const CROWD = [11, 50.5], ACTION = [30, 96]; // world y-ranges of the redrawn strips
   const layer = () => { const c = document.createElement('canvas'); root.appendChild(c); return { c, g: c.getContext('2d'), k: 1, top: 0 }; };
   root.textContent = '';
@@ -588,7 +605,7 @@ function createBallpark(root, stage, onRebuild) {
     place(action, ACTION[0], ACTION[1], dpr, r.width);
     const cs = getComputedStyle(root), v = (n) => cs.getPropertyValue(n).trim();
     C = { skyTop: v('--sky-top'), skyLow: v('--sky-low'), facade: v('--facade'), stands: v('--stands'), seats: v('--seats'), wall: v('--wall'), wallCap: v('--wall-cap'),
-      grass: v('--grass'), track: v('--track'), dirt: v('--dirt'), pebble: v('--pebble'), chalk: v('--chalk'), bag: v('--bag'), bagTop: v('--bag-top'), haze: v('--haze'), lights: v('--lights') === '1' };
+      grass: v('--grass'), track: v('--track'), dirt: v('--dirt'), pebble: v('--pebble'), chalk: v('--chalk'), bag: v('--bag'), bagTop: v('--bag-top'), haze: v('--haze'), dust: v('--dust'), lights: v('--lights') === '1' };
 
     // The still layer: sky, lights, upper deck, empty stands, wall and grass.
     const g = still.g; world(still);
@@ -627,29 +644,32 @@ function createBallpark(root, stage, onRebuild) {
     return true;
   }
 
-  let ready = false;
-  function draw(d, t) {
+  let ready = false, crowdAt = -1;
+  function draw(d, t, bx) {
     if (!ready) ready = rebuild();
     if (!ready) return null;
-    // Crowd strip: seat rows, then fans hopping up (eased down) and swaying, each on their own beat, then haze.
-    let g = crowd.g; g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, crowd.c.width, crowd.c.height);
-    world(crowd); g.fillStyle = C.seats;
-    for (const [y, sc] of [[24, 0.36], [31, 0.44], [39, 0.54], [48, 0.68]]) g.fillRect(x0, y - 3.2 * sc, wU, 3.2 * sc);
-    for (const fn of fans) {
-      const ph = (t / fn.period + fn.phase) % 1, hop = Math.sin(Math.PI * ph) ** 2;
-      world(crowd, fn.x, fn.y);
-      g.translate(0, -3.4 * fn.sc * hop); g.rotate(0.06 * fn.sway * Math.sin(2 * Math.PI * ph));
-      g.drawImage(fn.img, -6 * fn.sc, -15.5 * fn.sc, 12 * fn.sc, 17 * fn.sc);
+    // Crowd strip (refreshed up to 40 times a second, plenty for a bounce): seat rows, then fans
+    // hopping up (eased down) and swaying, each on their own beat, then haze.
+    let g = crowd.g;
+    if (Math.abs(t - crowdAt) >= 0.025) {
+      crowdAt = t;
+      g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, crowd.c.width, crowd.c.height);
+      world(crowd); g.fillStyle = C.seats;
+      for (const [y, sc] of [[24, 0.36], [31, 0.44], [39, 0.54], [48, 0.68]]) g.fillRect(x0, y - 3.2 * sc, wU, 3.2 * sc);
+      for (const fn of fans) {
+        const ph = (t / fn.period + fn.phase) % 1, hop = Math.sin(Math.PI * ph) ** 2;
+        world(crowd, fn.x, fn.y);
+        g.translate(0, -3.4 * fn.sc * hop); g.rotate(0.06 * fn.sway * Math.sin(2 * Math.PI * ph));
+        g.drawImage(fn.img, -6 * fn.sc, -15.5 * fn.sc, 12 * fn.sc, 17 * fn.sc);
+      }
+      world(crowd); g.fillStyle = C.haze; g.fillRect(x0, CROWD[0], wU, CROWD[1] - CROWD[0]); // aerial haze pushes the stands back
     }
-    world(crowd); g.fillStyle = C.haze; g.fillRect(x0, CROWD[0], wU, CROWD[1] - CROWD[0]); // aerial haze pushes the stands back
     // Action strip: the base path scrolling under the runner, the chalk line and a base.
     g = action.g; g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, action.c.width, action.c.height);
     world(action);
     const dm = ((d % TILE) + TILE) % TILE;
-    for (let x = Math.floor((x0 + dm) / TILE) * TILE - dm; x < x0 + wU; x += TILE) g.drawImage(tile, x, PATH - 9, TILE, 15);
+    for (let x = Math.floor((x0 + dm) / TILE) * TILE - dm; x < x0 + wU; x += TILE) g.drawImage(tile, x, PATH - 9, TILE + 2 / action.k, 15); // a pixel of overlap hides seams
     g.fillStyle = C.chalk; g.globalAlpha = 0.9; g.fillRect(x0, PATH + 3.2, wU, 0.9); g.globalAlpha = 1;
-    // A base comes in from the right edge; at d = 40 it sits under the runner's foot.
-    const gap = Math.max(BASE_GAP, wU + 40), right = x0 + wU + 12, bx = right - ((d + right - 96) % gap + gap) % gap;
     g.translate(bx, PATH - 0.6);
     g.fillStyle = 'rgba(58,36,20,0.25)'; g.beginPath(); g.ellipse(0.6, 1.3, 5.2, 1, 0, 0, 2 * Math.PI); g.fill();
     g.fillStyle = C.bag; rrect(g, -4.4, -1.1, 8.8, 2.4, 0.6); g.fill();
@@ -657,8 +677,29 @@ function createBallpark(root, stage, onRebuild) {
     world(action);
     return g;
   }
-  const again = () => { ready = false; onRebuild(); };
+  // Dust kicked off the bag: chalky puffs that billow out, rise, spread and fade, and
+  // drift back with the ground (they hang in the air while the runner moves on).
+  let puffs = [];
+  function dust(x, t) {
+    for (let i = 0; i < 34; i++) {
+      const a = Math.PI * (0.04 + 0.92 * rnd()), sp = 5 + rnd() * 13, side = rnd() < 0.5 ? -1 : 1;
+      puffs.push({ x: x + side * (0.5 + rnd() * 4), y: PATH - 1 - rnd() * 1.5, vx: Math.cos(a) * sp * side, vy: -Math.sin(a) * sp * 0.75, r: 0.9 + rnd() * 1.3, born: t, life: 0.7 + rnd() * 0.7, d0: null, c: rnd() < 0.65 ? C.dust : C.dirt });
+    }
+  }
+  function front(g, d, t) {
+    if (!puffs.length) return;
+    puffs = puffs.filter((q) => t >= q.born && t - q.born < q.life);
+    for (const q of puffs) {
+      if (q.d0 === null) q.d0 = d;
+      const age = (t - q.born) / q.life, e = 1 - (1 - age) ** 2; // fast out, slowing down
+      const x = q.x + q.vx * e * q.life - (d - q.d0), y = q.y + q.vy * e * q.life - 2.5 * age;
+      g.globalAlpha = 0.7 * (1 - age) ** 1.3; g.fillStyle = q.c;
+      g.beginPath(); g.arc(x, y, q.r * (1 + 3 * age), 0, 2 * Math.PI); g.fill();
+    }
+    g.globalAlpha = 1;
+  }
+  const again = () => { ready = false; crowdAt = -1; onRebuild(); };
   if (window.ResizeObserver) { const ro = new ResizeObserver(again); ro.observe(root); if (stage !== root) ro.observe(stage); }
   matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', again);
-  return { draw, path: PATH, runX: 56 };
+  return { draw, front, dust, span: () => [x0, x0 + wU], path: PATH, runX: 56 };
 }

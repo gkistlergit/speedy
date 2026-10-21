@@ -83,10 +83,10 @@ main { flex: 1; min-height: 0; position: relative; overflow: hidden; }
 /* runner and ballpark: drawn on stacked canvases (js/visuals.js), coloured from these custom properties.
    Uniform: a cream alternate-style baseball uniform with red trim. */
 .runner { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none;
-  --skin: #c08a64; --hair: #1d2433; --cream: #f2ead6; --red: #c41e3a; --navy: #0c2340; --sole: #16181d; --spike: #a4abb8; --seam: rgba(16, 24, 40, 0.18);
+  --skin: #c08a64; --hair: #1d2433; --cream: #f2ead6; --red: #c41e3a; --navy: #0c2340; --sole: #16181d; --spike: #a4abb8; --seam: rgba(16, 24, 40, 0.18); --outline: #161a24; --dust: #efe6d4;
   --sky-top: #8fcdf2; --sky-low: #dff1fb; --facade: #0c2340; --stands: #c3c9d3; --seats: #9e1b2f; --wall: #1f4d33; --wall-cap: #f2c230;
   --grass: #5aa548; --track: #b88356; --dirt: #c9915f; --pebble: #b07a4b; --chalk: #ffffff; --bag: #ffffff; --bag-top: #f3f4f6; --haze: rgba(226, 242, 252, 0.4); --lights: 0; }
-@media (prefers-color-scheme: dark) { .runner { --skin: #c99470; --hair: #05060a; --cream: #eee5cf; --navy: #26406b; --seam: transparent;
+@media (prefers-color-scheme: dark) { .runner { --skin: #c99470; --hair: #05060a; --cream: #eee5cf; --navy: #26406b; --seam: transparent; --outline: #06080c; --dust: #d9cdb6;
   --sky-top: #050b18; --sky-low: #16264a; --stands: #222a3b; --seats: #6d1424; --wall: #143424;
   --grass: #2f7330; --track: #7c5638; --dirt: #8f6342; --pebble: #7a5236; --chalk: #e9eef5; --bag: #eef2f7; --bag-top: #dfe5ee; --haze: rgba(8, 15, 32, 0.45); --lights: 1; } }
 .go:active { transform: translateX(-50%) scale(0.97); }
