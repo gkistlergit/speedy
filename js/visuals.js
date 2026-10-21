@@ -605,7 +605,7 @@ function createBallpark(root, stage, onRebuild) {
     place(action, ACTION[0], ACTION[1], dpr, r.width);
     const cs = getComputedStyle(root), v = (n) => cs.getPropertyValue(n).trim();
     C = { skyTop: v('--sky-top'), skyLow: v('--sky-low'), facade: v('--facade'), stands: v('--stands'), seats: v('--seats'), wall: v('--wall'), wallCap: v('--wall-cap'),
-      grass: v('--grass'), track: v('--track'), dirt: v('--dirt'), pebble: v('--pebble'), chalk: v('--chalk'), bag: v('--bag'), bagTop: v('--bag-top'), haze: v('--haze'), dust: v('--dust'), lights: v('--lights') === '1' };
+      grass: v('--grass'), track: v('--track'), dirt: v('--dirt'), pebble: v('--pebble'), chalk: v('--chalk'), bag: v('--bag'), bagTop: v('--bag-top'), haze: v('--haze'), dust: v('--dust'), scuff: v('--scuff'), lights: v('--lights') === '1' };
 
     // The still layer: sky, lights, upper deck, empty stands, wall and grass.
     const g = still.g; world(still);
@@ -670,17 +670,35 @@ function createBallpark(root, stage, onRebuild) {
     const dm = ((d % TILE) + TILE) % TILE;
     for (let x = Math.floor((x0 + dm) / TILE) * TILE - dm; x < x0 + wU; x += TILE) g.drawImage(tile, x, PATH - 9, TILE + 2 / action.k, 15); // a pixel of overlap hides seams
     g.fillStyle = C.chalk; g.globalAlpha = 0.9; g.fillRect(x0, PATH + 3.2, wU, 0.9); g.globalAlpha = 1;
+    if (bx > lastBx + 1) scuffed = false; // a fresh base came in from the right
+    lastBx = bx;
+    // The cleat's impact: the bag squashes and springs back with a damped wobble, gets a
+    // small shove, a shock ring runs out across the dirt, and the bag keeps a scuff mark.
+    const since = t - hitAt, live = since >= 0 && since < 0.6;
+    const squash = live ? 0.32 * Math.exp(-since * 9) * Math.cos(since * 34) : 0;
+    const shove = live ? -0.7 * Math.sin(Math.min(1, since * 6) * Math.PI / 2) * Math.exp(-since * 3) : 0;
     g.translate(bx, PATH - 0.6);
-    g.fillStyle = 'rgba(58,36,20,0.25)'; g.beginPath(); g.ellipse(0.6, 1.3, 5.2, 1, 0, 0, 2 * Math.PI); g.fill();
+    if (live && since < 0.4) {
+      const k = since / 0.4;
+      g.strokeStyle = C.dust; g.globalAlpha = 0.45 * (1 - k); g.lineWidth = 0.5 * (1 - k) + 0.15;
+      g.beginPath(); g.ellipse(0, 1.2, 4.5 + 7 * k, 0.8 + 1.1 * k, 0, 0, 2 * Math.PI); g.stroke(); g.globalAlpha = 1;
+    }
+    g.fillStyle = 'rgba(58,36,20,0.25)'; g.beginPath(); g.ellipse(0.6, 1.3, 5.2 * (1 + squash * 0.4), 1, 0, 0, 2 * Math.PI); g.fill();
+    g.translate(shove, 1.3); g.scale(1 + squash * 0.5, 1 - squash); g.translate(0, -1.3); // squash from the bottom edge
     g.fillStyle = C.bag; rrect(g, -4.4, -1.1, 8.8, 2.4, 0.6); g.fill();
     g.fillStyle = C.bagTop; rrect(g, -4.4, -1.1, 8.8, 0.8, 0.4); g.fill();
+    if (scuffed) {
+      g.fillStyle = C.scuff; g.beginPath(); g.ellipse(-0.4, -0.75, 2.6, 0.35, 0, 0, 2 * Math.PI); g.fill();
+      for (const sx of [-2.2, -1, 0.4, 1.6]) { g.beginPath(); g.arc(sx, -0.55, 0.22, 0, 2 * Math.PI); g.fill(); }
+    }
     world(action);
     return g;
   }
-  // Dust kicked off the bag: chalky puffs that billow out, rise, spread and fade, and
+  // Dust kicked off the bag (and the impact above): chalky puffs that billow out, rise, spread and fade, and
   // drift back with the ground (they hang in the air while the runner moves on).
-  let puffs = [];
+  let puffs = [], hitAt = -9, scuffed = false, lastBx = 0;
   function dust(x, t) {
+    hitAt = t; scuffed = true;
     for (let i = 0; i < 12; i++) {
       const a = Math.PI * (0.06 + 0.88 * rnd()), sp = 4 + rnd() * 8, side = rnd() < 0.5 ? -1 : 1;
       puffs.push({ x: x + side * (0.5 + rnd() * 3.5), y: PATH - 1 - rnd(), vx: Math.cos(a) * sp * side, vy: -Math.sin(a) * sp * 0.5, r: 0.6 + rnd() * 0.8, born: t, life: 0.45 + rnd() * 0.4, d0: null, c: rnd() < 0.65 ? C.dust : C.dirt });
