@@ -572,6 +572,17 @@ export function createRunner(root, stage = root) {
     fill('red', H([[4.4, -8.3], [6.6, -8.1], [8.2, -7.4], [7.6, -6.8], [5.6, -6.8], [4.4, -7.0]]));
     fill('skin', H([[-0.9, -5.2], [0.4, -5.0], [0.6, -3.7], [-0.4, -3.2], [-1.2, -4.1]]), true);
     fill('shine', H([[-3.4, -8.4], [-1.5, -10.2], [1.3, -10.6], [3.0, -9.9], [1.1, -9.8], [-1.1, -9.3], [-2.8, -7.8]]));
+    // Dive mask over the eyes, strapped round the helmet, and a snorkel from the mouthpiece up the
+    // side of the head to above the water line (straight up in the world, whichever way his head is).
+    fill('ink', H([[2.4, -6.9], [-5.3, -6.2], [-5.4, -5.2], [2.4, -5.7]])); // strap
+    fill('ink', H([[2.3, -7.5], [5.7, -7.3], [6.5, -5.6], [6.1, -4.0], [2.6, -3.8], [2.0, -5.6]]));
+    fill('lens', H([[2.9, -6.9], [5.4, -6.7], [5.9, -5.6], [5.6, -4.5], [3.1, -4.4], [2.6, -5.6]]));
+    fill('glint', H([[3.4, -6.5], [4.6, -6.4], [4.3, -6.0], [3.3, -6.0]]));
+    const hp = (pt) => rot(nt, J.head, pt), mouth = hp([5.4, -1.6]), side = hp([1.2, -2.6]), up = [side[0] - 1.5, side[1] - 13];
+    const tube = line([mouth, hp([3.6, -1.4]), side, lerp(side, up, 0.5), up]);
+    stroke('ink', tube, false, 2.1); stroke('tube', tube, false, 1.3);
+    stroke('ink', line([lerp(side, up, 0.88), up]), false, 2.3); stroke('glint', line([lerp(side, up, 0.88), up]), false, 1.5); // white tip
+    B.snorkel = up;
     drawArm(B.armN, false);
     return B;
   }
@@ -611,7 +622,8 @@ export function createRunner(root, stage = root) {
     C.far = {};
     for (const k in C) C.far[k] = /^#[0-9a-f]{6}$/i.test(C[k]) ? shade(C[k], 0.74) : C[k];
     C.far.cream = C.far.strap = v('--cream-far'); // a warm cream in shadow, not grey
-    C.outline = v('--outline');
+    C.outline = C.ink = v('--outline');
+    C.tube = v('--red'); C.lens = 'rgba(175,228,255,0.6)'; C.glint = 'rgba(255,255,255,0.85)';
   }
   // A bold dark outline around the whole silhouette (every shape stroked first, then filled
   // over, so only the outer edge survives) plus a thin line round each part makes him pop
@@ -685,11 +697,13 @@ export function createRunner(root, stage = root) {
     if (mode === 'tumble') for (const [at, n] of [[0.1, 16], [0.8, 10], [1.5, 8]]) if (tumbleBubbles < at && t - mT >= at) {
       const c = lerp(B.o, B.top, 0.4); park.bubble(wx(c[0]), wy(c[1]), n, t, 8); tumbleBubbles = at;
     }
-    // He breathes out a few bubbles every couple of seconds, and a trickle comes off his kicking feet.
+    // He breathes out through the snorkel: a puff of bubbles from its top every second or so
+    // (turned with him if he's mid-somersault), and a trickle comes off his kicking feet.
     if (raf && t >= breath) {
-      const m = rot(B.nt, J.head, [5.4, -2.4]);
-      park.bubble(wx(m[0]), wy(m[1]), 3 + Math.floor(Math.random() * 3), t, 0.6);
-      breath = t + 1.4 + Math.random() * 1.2;
+      let top = B.snorkel;
+      if (J.spin) { const c = lerp(B.o, B.top, 0.35); top = rot(c, J.spin, [top[0] - c[0], top[1] - c[1]]); }
+      park.bubble(wx(top[0]), wy(top[1]), 3 + Math.floor(Math.random() * 3), t, 0.5);
+      breath = t + 0.9 + Math.random() * 0.7;
     }
     if (raf && mode !== 'tumble' && Math.floor(6 * p) !== Math.floor(6 * p0)) { const toe = (Math.floor(6 * p) % 2 ? B.legF : B.legN).toe; park.bubble(wx(toe[0]), wy(toe[1]), 1, t, 1); }
     ctx.save(); ctx.translate(ox + xo, park.path - GROUND * K); ctx.scale(K, K);
