@@ -2,121 +2,224 @@ const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matche
 export const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#888888';
 
 // ---------- Particle swirl (video test backdrop) ----------
-// A slowly precessing vortex: three depth layers of comets spiral into a bright
-// core, with tapered trails, bokeh in the foreground, nebula light, a breathing
-// core glow, vignette and film grain. Speed follows the test's throughput.
+// A 3D vortex filmed by a slowly orbiting camera: comets spiral down a thick,
+// funnelled disc into a glowing core, circled by a tilted accretion ring whose
+// near side crosses in front of the core. Real perspective, fog, soft near
+// particles and foreground bokeh sell the depth. Speed follows the throughput.
+// Cheap per frame: backdrop and vignette+grain are pre-rendered, glows are
+// sprites, and comets are batched into one stroke per (depth side, width,
+// alpha, colour) bucket, drawn far to near.
 export function createSwirl(canvas) {
   const ctx = canvas.getContext('2d');
   const PALETTE = [[77, 141, 255], [124, 58, 237], [56, 189, 248], [167, 139, 250], [37, 99, 235], [226, 232, 240], [99, 102, 241], [148, 163, 184]];
   const CORE = [226, 236, 255];
-  let W = 0, H = 0, R = 0, parts = [], bokeh = [], raf = 0, intensity = 0.35, target = 0.35, t = 0, flare = 0, last = 0;
-  let vignette = null, grain = null;
+  const RO = 2.6, YC = -0.5, FC = 0.3, RING = 0.42, BODY = 0.15, DIST = 2.7, EL = 0.85, TAU = Math.PI * 2; // world units
+  const NW = 16, NA = 16, W0 = 0.45, A0 = 0.028, WS = 1.4, AS = 1.4, IW = 1 / Math.log(WS), IA = 1 / Math.log(AS);
+  const WL = Array.from({ length: NW }, (_, i) => W0 * WS ** i), AL = Array.from({ length: NA }, (_, i) => Math.min(1, A0 * AS ** i));
+  const mix = (c, d, f) => `rgb(${c.map((v, i) => Math.round(v + (d[i] - v) * f))})`;
+  // the palette, then three white-hot tints shared near the core (few colours = few stroke batches), then spark white
+  const COLS = PALETTE.map((c) => `rgb(${c})`).concat([0, 1, 2].map((i) => mix(PALETTE[i], CORE, 0.72)), 'rgb(240,245,255)');
+  const HOT = [8, 9, 10, 9, 8, 10, 9, 8], SPARK = COLS.length - 1;
   const smooth = (e0, e1, x) => { const k = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return k * k * (3 - 2 * k); };
-  function spawn(anywhere) {
-    const z = Math.random() < 0.55 ? 0.35 + Math.random() * 0.25 : Math.random() < 0.8 ? 0.65 + Math.random() * 0.2 : 0.9 + Math.random() * 0.1;
-    return {
-      r: anywhere ? Math.sqrt(Math.random()) * R : R * (0.85 + Math.random() * 0.25),
-      a: Math.random() * Math.PI * 2,
-      w: (0.35 + Math.random()) * 0.012,
-      c: PALETTE[(Math.random() * PALETTE.length) | 0],
-      s: 0.4 + Math.random() * 1.4,
-      z, tw: Math.random() * Math.PI * 2,
-      spark: Math.random() < 0.18,
-    };
+  const clamp = (x, a = -1, b = 1) => Math.max(a, Math.min(b, x));
+  const funnel = (r, h) => (YC * FC) / (r + FC) + 0.05 * r * r + h * (0.03 + 0.1 * r); // a bowl that sinks into a throat at the core, thicker outside
+  const layer = (w, h) => { const c = document.createElement('canvas'); c.width = Math.max(1, Math.ceil(w)); c.height = Math.max(1, Math.ceil(h)); return [c, c.getContext('2d')]; };
+  function sprite(size, stops) {
+    const [c, g] = layer(size, size), gr = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    for (const [o, col] of stops) gr.addColorStop(o, col);
+    g.fillStyle = gr; g.fillRect(0, 0, size, size); return c;
   }
-  function makeGrain() {
-    const g = document.createElement('canvas'); g.width = g.height = 128;
-    const gx = g.getContext('2d'), img = gx.createImageData(128, 128);
+  const HALO = sprite(128, [[0, 'rgba(226,236,255,0.9)'], [0.12, 'rgba(170,180,255,0.5)'], [0.4, 'rgba(99,102,241,0.16)'], [1, 'rgba(99,102,241,0)']]);
+  const BODYS = sprite(128, [[0, 'rgba(250,252,255,1)'], [0.35, 'rgba(214,222,255,1)'], [0.7, 'rgba(140,146,236,0.9)'], [0.88, 'rgba(84,80,190,0.5)'], [1, 'rgba(60,50,160,0)']]);
+  const BOKEH = PALETTE.map((c) => sprite(64, [[0, `rgba(${c},0.55)`], [0.72, `rgba(${c},0.7)`], [0.86, `rgba(${c},0.45)`], [1, `rgba(${c},0)`]]));
+  let W = 0, H = 0, F = 0, M = 0, parts = [], ring = [], bokeh = [], raf = 0, intensity = 0.35, target = 0.35, t = 0, ct = 0, flare = 0, last = 0;
+  let back = null, over = null, keys = new Uint32Array(0), P = new Float32Array(0), px = 0, py = 0, pz = 0;
+  const band = new Float32Array(49 * 3), tilt = { x: 0, y: 0, tx: 0, ty: 0, b0: null };
+  function spawn(p, anywhere) {
+    p.r = RO * Math.sqrt(anywhere ? Math.random() * 1.1 : 0.2 + Math.random() * 0.9); p.f = anywhere ? 1 : 0;
+    p.a = Math.random() * TAU; p.h = Math.random() + Math.random() - 1;
+    p.w = (0.35 + Math.random()) * 0.008; p.v = 0.7 + Math.random() * 0.6;
+    p.c = (Math.random() * PALETTE.length) | 0; p.s = 0.4 + Math.random() * 1.4; p.b = Math.random();
+    p.tw = Math.random() * TAU; p.spark = Math.random() < 0.18;
+    return p;
+  }
+  function makeBackdrop() { // deep background, lighter toward the core, with nebula light; oversized for parallax
+    const [b, g] = layer(W + 2 * M, H + 2 * M), x = W / 2 + M, y = H * 0.48 + M, R = Math.hypot(W, H) / 1.5;
+    let gr = g.createRadialGradient(x, y, 0, x, y, R);
+    gr.addColorStop(0, '#161c2b'); gr.addColorStop(0.45, '#0f131c'); gr.addColorStop(1, '#07090d');
+    g.fillStyle = gr; g.fillRect(0, 0, b.width, b.height);
+    g.globalCompositeOperation = 'lighter';
+    for (const [rgb, ox, oy] of [['176,122,85', -0.32, -0.26], ['111,132,102', 0.34, 0.06], ['201,183,156', -0.12, 0.3]]) {
+      const bx = x + ox * W, by = y + oy * H; gr = g.createRadialGradient(bx, by, 0, bx, by, Math.max(W, H) * 0.5);
+      gr.addColorStop(0, `rgba(${rgb},0.07)`); gr.addColorStop(1, `rgba(${rgb},0)`);
+      g.fillStyle = gr; g.fillRect(0, 0, b.width, b.height);
+    }
+    return b;
+  }
+  function makeOverlay() { // vignette with film grain baked in; drawn a few px off each frame so the grain shimmers
+    const [o, g] = layer(W + 4, H + 4), v = g.createRadialGradient(W / 2 + 2, H / 2 + 2, Math.min(W, H) * 0.3, W / 2 + 2, H / 2 + 2, Math.hypot(W, H) * 0.62);
+    v.addColorStop(0, 'rgba(6,8,12,0)'); v.addColorStop(1, 'rgba(6,8,12,0.78)');
+    g.fillStyle = v; g.fillRect(0, 0, o.width, o.height);
+    const [n, nx] = layer(128, 128), img = nx.createImageData(128, 128);
     for (let i = 0; i < img.data.length; i += 4) { const v = (Math.random() * 255) | 0; img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 255; }
-    gx.putImageData(img, 0, 0);
-    return ctx.createPattern(g, 'repeat');
+    nx.putImageData(img, 0, 0);
+    g.globalAlpha = 0.045; g.fillStyle = g.createPattern(n, 'repeat'); g.fillRect(0, 0, o.width, o.height);
+    return o;
   }
   function resize() {
     const dpr = Math.min(2, devicePixelRatio || 1);
-    W = canvas.clientWidth; H = canvas.clientHeight; R = Math.hypot(W, H) / 1.7;
+    W = canvas.clientWidth; H = canvas.clientHeight;
     canvas.width = W * dpr; canvas.height = H * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const n = Math.round(Math.min(1000, (W * H) / 360));
-    parts = Array.from({ length: n }, () => spawn(true));
-    bokeh = Array.from({ length: 14 }, () => ({ r: R * (0.35 + Math.random() * 0.75), a: Math.random() * Math.PI * 2, w: 0.0006 + Math.random() * 0.0012, size: 14 + Math.random() * 34, c: PALETTE[(Math.random() * PALETTE.length) | 0] }));
-    vignette = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.hypot(W, H) * 0.62);
-    vignette.addColorStop(0, 'rgba(6,8,12,0)'); vignette.addColorStop(1, 'rgba(6,8,12,0.78)');
-    if (!grain) grain = makeGrain();
+    if (!W || !H) return;
+    F = Math.max(W * 1.1, H * 0.6); M = Math.round(Math.max(W, H) * 0.12);
+    const n = Math.round(Math.min(1000, (W * H) / 360)), nr = Math.round(n * 0.12);
+    parts = Array.from({ length: n }, () => spawn({}, true));
+    ring = Array.from({ length: nr }, () => ({ a: Math.random() * TAU, r: RING * (0.85 + Math.random() * 0.35), h: (Math.random() - 0.5) * 0.04, w: 0.012 + Math.random() * 0.01, c: [0, 2, 3, 5][(Math.random() * 4) | 0], s: 0.5 + Math.random(), b: Math.random(), tw: Math.random() * TAU, spark: Math.random() < 0.3 }));
+    bokeh = Array.from({ length: 18 }, () => ({ r: 0.5 + Math.random() * 2.2, a: Math.random() * TAU, y: -0.4 + Math.random() * 1.6, w: 0.0006 + Math.random() * 0.0012, size: 0.05 + Math.random() * 0.1, c: (Math.random() * PALETTE.length) | 0 }));
+    keys = new Uint32Array((n + nr) * 3); P = new Float32Array((n + nr) * 6);
+    back = makeBackdrop(); over = makeOverlay();
   }
+  const onTilt = (e) => {
+    if (e.beta == null || e.gamma == null) return;
+    tilt.b0 = tilt.b0 == null ? e.beta : tilt.b0 + (e.beta - tilt.b0) * 0.02; // slowly re-centre on how the phone is held
+    tilt.tx = clamp(e.gamma / 40) * 0.3; tilt.ty = clamp((e.beta - tilt.b0) / 30) * 0.14;
+  };
   function frame(now) {
     const k = last ? Math.min(3, (now - last) / 16.667) : 1; last = now;
-    t += (0.004 + intensity * 0.01) * k;
+    t += (0.004 + intensity * 0.01) * k; ct += k / 60;
     intensity += (target - intensity) * 0.03 * k;
     flare *= Math.pow(0.965, k);
-    const cx = W * 0.5 + Math.sin(t * 0.7) * W * 0.05;
-    const cy = H * 0.48 + Math.cos(t * 0.5) * H * 0.035;
-    const tilt = 0.8 + Math.sin(t * 0.31) * 0.07, rot = Math.sin(t * 0.17) * 0.35;
-    const cr = Math.cos(rot), sr = Math.sin(rot);
-    const proj = (a, r) => { const x = Math.cos(a) * r, y = Math.sin(a) * r * tilt; return [cx + x * cr - y * sr, cy + x * sr + y * cr]; };
+    tilt.x += (tilt.tx - tilt.x) * 0.05 * k; tilt.y += (tilt.ty - tilt.y) * 0.05 * k;
+    if (!W || !H) { if (raf) raf = requestAnimationFrame(frame); return; }
 
-    // deep background, lighter toward the core
-    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
-    const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
-    bg.addColorStop(0, '#161c2b'); bg.addColorStop(0.45, '#0f131c'); bg.addColorStop(1, '#07090d');
-    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+    // camera: orbits and tilts around a slowly wandering look-at point, with a little roll
+    const az = 0.7 * Math.sin(ct * 0.045) + 0.25 * Math.sin(ct * 0.11 + 1) + tilt.x, el = EL + 0.13 * Math.sin(ct * 0.07) + tilt.y;
+    const roll = 0.12 * Math.sin(ct * 0.05 + 2), cr = Math.cos(roll), sr = Math.sin(roll);
+    const sa = Math.sin(az), ca = Math.cos(az), se = Math.sin(el), ce = Math.cos(el);
+    const lx = Math.sin(ct * 0.09) * 0.08, ly = YC * 0.6, lz = Math.cos(ct * 0.07) * 0.08;
+    const ex = lx + DIST * ce * sa, ey = ly + DIST * se, ez = lz + DIST * ce * ca;
+    const fx = -ce * sa, fy = -se, fz = -ce * ca; // forward; right = (ca, 0, -sa), up = (-sa se, ce, -ca se), rolled:
+    const rx = ca * cr + sa * se * sr, ry = -ce * sr, rz = -sa * cr + ca * se * sr;
+    const ux = ca * sr - sa * se * cr, uy = ce * cr, uz = -sa * sr - ca * se * cr;
+    const SX = W / 2, SY = H * 0.48;
+    const proj = (x, y, z) => { x -= ex; y -= ey; z -= ez; pz = x * fx + y * fy + z * fz; const s = F / pz; px = SX + (x * rx + y * ry + z * rz) * s; py = SY - (x * ux + y * uy + z * uz) * s; };
+    proj(0, YC, 0); const kx = px, ky = py, kz = pz, ks = F / pz; // the core on screen
+    const pulse = 0.85 + Math.sin(t * 3) * 0.15;
+
+    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; ctx.lineCap = 'round';
+    ctx.drawImage(back, clamp(-az * M * 0.55, -M, M) - M, clamp((el - EL) * M * 2.5, -M, M) - M, W + 2 * M, H + 2 * M);
+
+    // comets and ring particles -> sort keys: side of the core | width | alpha | colour | index | part
+    const spin = 0.5 + intensity * 2.6, pull = 0.12 + intensity * 1.3, trail = 12 + intensity * 20;
+    let m = 0;
+    const emit = (i, front, lw, al, col, part) => {
+      const ai = Math.min(NA - 1, Math.round(Math.log(al / A0) * IA)); if (ai < 0) return;
+      const wi = lw <= W0 ? 0 : Math.min(NW - 1, Math.round(Math.log(lw / W0) * IW));
+      keys[m++] = (((((front * NW + wi) * NA + ai) << 6) | col) << 13) | (i << 2) | part;
+    };
+    // writes tail, mid, head into P; false if any is behind the camera
+    const put = (o, x0, y0, z0, x1, y1, z1, x2, y2, z2) => {
+      proj(x0, y0, z0); if (pz < 0.2) return false; P[o] = px; P[o + 1] = py;
+      proj(x1, y1, z1); if (pz < 0.2) return false; P[o + 2] = px; P[o + 3] = py;
+      proj(x2, y2, z2); if (pz < 0.2) return false; P[o + 4] = px; P[o + 5] = py; return true;
+    };
+    // depth cues: perspective size, fog toward the far side, near particles soft (wider and fainter)
+    const look = (i, p, front, rel, lw, al, col, near) => {
+      al *= Math.min(1.2, rel * rel) * smooth(0.2, 0.7, near);
+      const soft = Math.max(0, rel - 1.6) * 1.3; if (soft) { lw *= 1 + soft; al /= (1 + soft) ** 1.5; }
+      if (soft || lw < 0.7) emit(i, front, lw, al * 0.7, col, 0); // out of focus or tiny: one stroke will do
+      else { emit(i, front, lw, al * 0.45, col, 0); emit(i, front, lw * 1.15, al, col, 1); } // tapered: faint tail, brighter head
+      if (p.spark) emit(i, front, (1.4 + p.b * 1.8) * Math.min(rel, 2), al * 1.5 * (0.55 + 0.45 * Math.sin(t * 9 + p.tw)), SPARK, 2);
+    };
+    for (let i = 0; i < parts.length; i++) {
+      const p = parts[i];
+      const da = p.w * spin * (1 + 0.25 / (p.r + 0.12)), dr = pull * (0.3 + (p.r / RO) * 0.9) * p.v * 0.0016 * RO;
+      p.a += da * k; p.r -= dr * k; p.f = Math.min(1, p.f + 0.02 * k);
+      if (p.r < 0.02) { spawn(p, false); continue; }
+      const fade = smooth(0.02, 0.22, p.r) * smooth(RO * 1.1, RO * 0.85, p.r) * p.f; if (fade < 0.01) continue;
+      const a1 = p.a - da * trail * 0.5, r1 = p.r + dr * trail * 0.5, a2 = p.a - da * trail, r2 = p.r + dr * trail;
+      if (!put(i * 6, Math.cos(a2) * r2, funnel(r2, p.h), Math.sin(a2) * r2, Math.cos(a1) * r1, funnel(r1, p.h), Math.sin(a1) * r1, Math.cos(p.a) * p.r, funnel(p.r, p.h), Math.sin(p.a) * p.r)) continue;
+      const rel = DIST / pz, heat = 1 - smooth(0, 0.6, p.r); // brightens to white near the core
+      look(i, p, pz < kz ? 1 : 0, rel, p.s * 0.85 * rel * (1 + heat * 0.9), (0.3 + p.b * 0.5) * fade, heat > 0.45 ? HOT[p.c] : p.c, pz);
+    }
+    // accretion ring: fixed in the world, tilted off the disc so the camera sees it nearly edge-on
+    const psi = 0.3 * Math.sin(ct * 0.05), rho = EL - 0.2 + 0.08 * Math.sin(ct * 0.06), cp = Math.cos(psi), sp = Math.sin(psi), cR = Math.cos(rho), sR = Math.sin(rho);
+    const Vx = -cR * sp, Vy = sR, Vz = cR * cp; // U = (cp, 0, sp)
+    const rx_ = (a, r) => Math.cos(a) * r * cp + Math.sin(a) * r * Vx, ry_ = (a, r, h) => YC + h + Math.sin(a) * r * Vy, rz_ = (a, r) => Math.cos(a) * r * sp + Math.sin(a) * r * Vz;
+    for (let j = 0, n = parts.length; j < ring.length; j++) {
+      const p = ring[j], da = p.w * spin, r = p.r; p.a += da * k;
+      const a0 = p.a - da * trail * 0.7, a1 = p.a - da * trail * 0.35;
+      if (!put((n + j) * 6, rx_(a0, r), ry_(a0, r, p.h), rz_(a0, r), rx_(a1, r), ry_(a1, r, p.h), rz_(a1, r), rx_(p.a, r), ry_(p.a, r, p.h), rz_(p.a, r))) continue;
+      look(n + j, p, pz < kz ? 1 : 0, DIST / pz, p.s * (DIST / pz) * 1.1, 0.3 + p.b * 0.45, HOT[p.c], pz);
+    }
+    for (let j = 0; j <= 48; j++) { const a = (j / 48) * TAU; proj(rx_(a, RING), ry_(a, RING, 0), rz_(a, RING)); band[j * 3] = px; band[j * 3 + 1] = py; band[j * 3 + 2] = pz; }
+    keys.subarray(0, m).sort(); // depth-ordered buckets: behind the core first, then thin (far) to wide (near)
+    let split = 0; while (split < m && keys[split] < 1 << 27) split++;
+    const strokes = (i0, i1) => {
+      let cur = -1, wi = -1, ai = -1, ci = -1;
+      for (let j = i0; j < i1; j++) {
+        const e = keys[j], key = e >>> 13;
+        if (key !== cur) {
+          if (cur >= 0) ctx.stroke();
+          cur = key; const c = key & 63, a = (key >> 6) & 15, w = (key >> 10) & 15;
+          if (w !== wi) ctx.lineWidth = WL[(wi = w)];
+          if (a !== ai) ctx.globalAlpha = AL[(ai = a)];
+          if (c !== ci) ctx.strokeStyle = COLS[(ci = c)];
+          ctx.beginPath();
+        }
+        const o = ((e >> 2) & 2047) * 6, part = e & 3;
+        if (part === 0) { ctx.moveTo(P[o], P[o + 1]); ctx.quadraticCurveTo(P[o + 2], P[o + 3], P[o + 4], P[o + 5]); }
+        else if (part === 1) { ctx.moveTo(P[o + 2], P[o + 3]); ctx.lineTo(P[o + 4], P[o + 5]); }
+        else { ctx.moveTo(P[o + 4], P[o + 5]); ctx.lineTo(P[o + 4] + 0.1, P[o + 5]); } // round cap = dot
+      }
+      if (cur >= 0) ctx.stroke();
+    };
+    const ringBand = (front) => { // the ring's continuous glow, split into the halves behind and in front of the core
+      ctx.beginPath();
+      for (let j = 0, open = false; j < 48; j++) {
+        const o = j * 3, f = band[o + 2] + band[o + 5] < 2 * kz;
+        if (f !== front) { open = false; continue; }
+        if (!open) ctx.moveTo(band[o], band[o + 1]);
+        ctx.lineTo(band[o + 3], band[o + 4]); open = true;
+      }
+    };
+    const glow = (img, r, a) => { ctx.globalAlpha = Math.min(1, a); ctx.drawImage(img, kx - r, ky - r, r * 2, r * 2); };
+    const bokehs = (front) => {
+      for (const b of bokeh) {
+        if (!front) b.a += b.w * (0.6 + intensity * 2) * k;
+        proj(Math.cos(b.a) * b.r, b.y, Math.sin(b.a) * b.r);
+        if (pz < 0.35 || pz < kz !== front) continue;
+        const s = Math.min(140, (b.size * F) / pz);
+        ctx.globalAlpha = 0.11 * Math.min(1, (24 / s) ** 0.6) * Math.min(1, DIST / pz) * smooth(0.35, 0.8, pz);
+        ctx.drawImage(BOKEH[b.c], px - s, py - s, s * 2, s * 2);
+      }
+    };
+    const bw = ks * 0.02 * (1 + flare);
 
     ctx.globalCompositeOperation = 'lighter';
-    // nebula light
-    const blobs = [['176,122,85', 0], ['111,132,102', 2.1], ['201,183,156', 4.2]];
-    for (const [rgb, off] of blobs) {
-      const bx = cx + Math.cos(t + off) * W * 0.28, by = cy + Math.sin(t * 1.1 + off) * H * 0.22;
-      const g = ctx.createRadialGradient(bx, by, 0, bx, by, Math.max(W, H) * 0.5);
-      g.addColorStop(0, `rgba(${rgb},${0.05 + intensity * 0.04})`); g.addColorStop(1, `rgba(${rgb},0)`);
-      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-    }
-    // far-side bokeh (soft, slow)
-    for (const b of bokeh) {
-      b.a += b.w * (0.6 + intensity * 2) * k;
-      const [x, y] = proj(b.a, b.r);
-      const g = ctx.createRadialGradient(x, y, 0, x, y, b.size);
-      g.addColorStop(0, `rgba(${b.c},0.07)`); g.addColorStop(0.7, `rgba(${b.c},0.04)`); g.addColorStop(1, `rgba(${b.c},0)`);
-      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, b.size, 0, Math.PI * 2); ctx.fill();
-    }
-
-    // comets
-    const spin = 0.5 + intensity * 2.6, pull = 0.12 + intensity * 1.3, trail = 12 + intensity * 20;
-    ctx.lineCap = 'round';
-    for (const p of parts) {
-      const da = p.w * spin * (1 + 60 / (p.r + 30)) * p.z, dr = pull * (0.25 + (p.r / R) * 1.4) * p.z;
-      p.a += da * k; p.r -= dr * k;
-      if (p.r < 4) { Object.assign(p, spawn(false)); continue; }
-      const fade = smooth(4, R * 0.1, p.r) * smooth(R * 1.1, R * 0.85, p.r);
-      if (fade < 0.01) continue;
-      const heat = 1 - smooth(0, R * 0.35, p.r); // brightens to white near the core
-      const col = p.c.map((v, i) => Math.round(v + (CORE[i] - v) * heat * 0.8)).join(',');
-      const [hx, hy] = proj(p.a, p.r);
-      const [mx, my] = proj(p.a - da * trail * 0.5, p.r + dr * trail * 0.5);
-      const [tx, ty] = proj(p.a - da * trail, p.r + dr * trail);
-      const lw = p.s * (0.45 + p.z * 0.9) * (1 + heat * 0.9), al = (0.22 + p.z * 0.6) * fade;
-      ctx.strokeStyle = `rgba(${col},${al * 0.45})`; ctx.lineWidth = lw;
-      ctx.beginPath(); ctx.moveTo(tx, ty); ctx.quadraticCurveTo(mx, my, hx, hy); ctx.stroke();
-      ctx.strokeStyle = `rgba(${col},${al})`; ctx.lineWidth = lw * 1.15;
-      ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(hx, hy); ctx.stroke();
-      if (p.spark) {
-        const tw = 0.55 + 0.45 * Math.sin(t * 9 + p.tw);
-        ctx.fillStyle = `rgba(240,245,255,${(0.5 + p.z * 0.5) * tw * fade})`;
-        ctx.beginPath(); ctx.arc(hx, hy, 0.7 + p.z * 0.9, 0, Math.PI * 2); ctx.fill();
-      }
-    }
-
-    // breathing core glow + flare
-    const pulse = 0.85 + Math.sin(t * 3) * 0.15, core = R * (0.16 + intensity * 0.1 + flare * 0.25);
-    const cg = ctx.createRadialGradient(cx, cy, 0, cx, cy, core);
-    cg.addColorStop(0, `rgba(226,236,255,${(0.22 + intensity * 0.3 + flare * 0.5) * pulse})`);
-    cg.addColorStop(0.35, `rgba(99,102,241,${(0.07 + intensity * 0.08 + flare * 0.2) * pulse})`);
-    cg.addColorStop(1, 'rgba(99,102,241,0)');
-    ctx.fillStyle = cg; ctx.fillRect(cx - core, cy - core, core * 2, core * 2);
+    glow(HALO, ks * (0.85 + intensity * 0.45 + flare * 1.2), (0.3 + intensity * 0.35 + flare * 0.6) * pulse); // outer halo
+    bokehs(false);
+    strokes(0, split);
+    ringBand(false); ctx.strokeStyle = 'rgb(150,190,255)'; ctx.lineWidth = bw * 4; ctx.globalAlpha = 0.07 + flare * 0.1; ctx.stroke();
+    ctx.strokeStyle = 'rgb(220,232,255)'; ctx.lineWidth = bw; ctx.globalAlpha = 0.35 + flare * 0.3; ctx.stroke();
+    // the core has volume: an opaque body hides what's behind it, glow layers sit on top
+    ctx.globalCompositeOperation = 'source-over';
+    glow(BODYS, ks * BODY * (1 + intensity * 0.25 + flare * 0.5), 0.92);
+    ctx.globalCompositeOperation = 'lighter';
+    glow(HALO, ks * BODY * (2.4 + intensity + flare * 2), (0.22 + intensity * 0.25 + flare * 0.5) * pulse);
+    glow(HALO, ks * BODY * 0.8, 0.4 * pulse + flare * 0.5);
+    // near half of the ring: a dusty lane across the core, then its bright edge
+    ringBand(true);
+    ctx.globalCompositeOperation = 'source-over'; ctx.strokeStyle = 'rgb(10,12,26)'; ctx.lineWidth = bw * 2.6; ctx.globalAlpha = 0.5; ctx.stroke();
+    ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = 'rgb(150,190,255)'; ctx.lineWidth = bw * 4; ctx.globalAlpha = 0.08 + flare * 0.1; ctx.stroke();
+    ctx.strokeStyle = 'rgb(232,240,255)'; ctx.lineWidth = bw * 1.1; ctx.globalAlpha = 0.6 + flare * 0.3; ctx.stroke();
+    strokes(split, m);
+    bokehs(true);
 
     // cinematic finish: vignette + grain
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.fillStyle = vignette; ctx.fillRect(0, 0, W, H);
-    ctx.globalAlpha = 0.045; ctx.save(); ctx.translate((Math.random() * 128) | 0, (Math.random() * 128) | 0);
-    ctx.fillStyle = grain; ctx.fillRect(-128, -128, W + 256, H + 256); ctx.restore(); ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+    ctx.drawImage(over, -((Math.random() * 4) | 0), -((Math.random() * 4) | 0));
     if (raf) raf = requestAnimationFrame(frame);
   }
   const ro = new ResizeObserver(() => { resize(); if (!raf) { last = 0; frame(performance.now()); } });
@@ -124,9 +227,10 @@ export function createSwirl(canvas) {
     start() {
       if (raf) return; ro.observe(canvas); resize(); last = 0;
       if (reduceMotion()) { target = intensity = 0.1; frame(performance.now()); return; }
+      addEventListener('deviceorientation', onTilt); // only fires where no permission prompt is needed
       raf = requestAnimationFrame(frame);
     },
-    stop() { cancelAnimationFrame(raf); raf = 0; ro.disconnect(); },
+    stop() { cancelAnimationFrame(raf); raf = 0; ro.disconnect(); removeEventListener('deviceorientation', onTilt); },
     set(v) { target = Math.max(0, Math.min(1, v)); },
     burst() { flare = 1; },
   };
