@@ -545,6 +545,8 @@ export function createRunner(root, stage = root) {
 // holding the base path and the runner is redrawn at full sharpness.
 function createBallpark(root, stage, onRebuild) {
   const PATH = 86, TILE = 24;
+  // The base to scale with the runner (about 6 ft = 47 units, so ~0.65 units an inch): 18 in across, ~3 in thick.
+  const BAG = 11.7, BH = 2.4;
   const CROWD = [11, 50.5], ACTION = [30, 96]; // world y-ranges of the redrawn strips
   const layer = () => { const c = document.createElement('canvas'); root.appendChild(c); return { c, g: c.getContext('2d'), k: 1, top: 0 }; };
   root.textContent = '';
@@ -681,12 +683,12 @@ function createBallpark(root, stage, onRebuild) {
     if (live && since < 0.4) {
       const k = since / 0.4;
       g.strokeStyle = C.dust; g.globalAlpha = 0.45 * (1 - k); g.lineWidth = 0.5 * (1 - k) + 0.15;
-      g.beginPath(); g.ellipse(0, 1.2, 4.5 + 7 * k, 0.8 + 1.1 * k, 0, 0, 2 * Math.PI); g.stroke(); g.globalAlpha = 1;
+      g.beginPath(); g.ellipse(0, 1.2, BAG / 2 + 7 * k, 0.8 + 1.1 * k, 0, 0, 2 * Math.PI); g.stroke(); g.globalAlpha = 1;
     }
-    g.fillStyle = 'rgba(58,36,20,0.25)'; g.beginPath(); g.ellipse(0.6, 1.3, 5.2 * (1 + squash * 0.4), 1, 0, 0, 2 * Math.PI); g.fill();
+    g.fillStyle = 'rgba(58,36,20,0.25)'; g.beginPath(); g.ellipse(0.6, 1.3, (BAG / 2 + 0.8) * (1 + squash * 0.4), 1, 0, 0, 2 * Math.PI); g.fill();
     g.translate(shove, 1.3); g.scale(1 + squash * 0.5, 1 - squash); g.translate(0, -1.3); // squash from the bottom edge
-    g.fillStyle = C.bag; rrect(g, -4.4, -1.1, 8.8, 2.4, 0.6); g.fill();
-    g.fillStyle = C.bagTop; rrect(g, -4.4, -1.1, 8.8, 0.8, 0.4); g.fill();
+    g.fillStyle = C.bag; rrect(g, -BAG / 2, 1.3 - BH, BAG, BH, 0.6); g.fill();
+    g.fillStyle = C.bagTop; rrect(g, -BAG / 2, 1.3 - BH, BAG, 0.8, 0.4); g.fill();
     if (scuffed) {
       g.fillStyle = C.scuff; g.beginPath(); g.ellipse(-0.4, -0.75, 2.6, 0.35, 0, 0, 2 * Math.PI); g.fill();
       for (const sx of [-2.2, -1, 0.4, 1.6]) { g.beginPath(); g.arc(sx, -0.55, 0.22, 0, 2 * Math.PI); g.fill(); }
@@ -701,7 +703,7 @@ function createBallpark(root, stage, onRebuild) {
     hitAt = t; scuffed = true;
     for (let i = 0; i < 12; i++) {
       const a = Math.PI * (0.06 + 0.88 * rnd()), sp = 4 + rnd() * 8, side = rnd() < 0.5 ? -1 : 1;
-      puffs.push({ x: x + side * (0.5 + rnd() * 3.5), y: PATH - 1 - rnd(), vx: Math.cos(a) * sp * side, vy: -Math.sin(a) * sp * 0.5, r: 0.6 + rnd() * 0.8, born: t, life: 0.45 + rnd() * 0.4, d0: null, c: rnd() < 0.65 ? C.dust : C.dirt });
+      puffs.push({ x: x + side * (0.5 + rnd() * BAG * 0.42), y: PATH - 1 - rnd(), vx: Math.cos(a) * sp * side, vy: -Math.sin(a) * sp * 0.5, r: 0.6 + rnd() * 0.8, born: t, life: 0.45 + rnd() * 0.4, d0: null, c: rnd() < 0.65 ? C.dust : C.dirt });
     }
   }
   function front(g, d, t) {
