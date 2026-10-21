@@ -624,6 +624,13 @@ export function createRunner(root, stage = root) {
     C.far.cream = C.far.strap = v('--cream-far'); // a warm cream in shadow, not grey
     C.outline = C.ink = v('--outline');
     C.tube = v('--red'); C.lens = 'rgba(175,228,255,0.6)'; C.glint = 'rgba(255,255,255,0.85)';
+    tinted = false;
+  }
+  // Seen through the water at his depth: once the park is built, blend its tint into his colours.
+  let tinted = false;
+  function tintUp() {
+    for (const set of [C, C.far]) for (const k in set) if (typeof set[k] === 'string') set[k] = park.under(set[k], 64);
+    tinted = true;
   }
   // A bold dark outline around the whole silhouette (every shape stroked first, then filled
   // over, so only the outer edge survives) plus a thin line round each part makes him pop
@@ -693,6 +700,7 @@ export function createRunner(root, stage = root) {
     if (mode === 'tumble') J = tumbled(J, t - mT);
     const ctx = park.draw(dist, t, buoyX ?? -1e4, buoyY);
     if (!ctx) return;
+    if (!tinted) tintUp();
     const B = pose(J);
     if (mode === 'tumble') for (const [at, n] of [[0.1, 16], [0.8, 10], [1.5, 8]]) if (tumbleBubbles < at && t - mT >= at) {
       const c = lerp(B.o, B.top, 0.4); park.bubble(wx(c[0]), wy(c[1]), n, t, 8); tumbleBubbles = at;
@@ -746,22 +754,31 @@ export function createRunner(root, stage = root) {
 // holding the base path and the runner is redrawn at full sharpness.
 // Underwater: the whole park is on the sea floor. A blue-green tint deepens toward the
 // bottom, light rays sway down from the surface, caustics flicker on the field, specks of
-// marine snow drift past, a few fish cruise over the stands, bubbles rise, and the base
+// marine snow drift past, big fish swim by in the foreground, bubbles rise, and the base
 // path kicks up slow, lingering clouds of silt instead of dust.
 function createBallpark(root, stage, onRebuild) {
   const PATH = 86, TILE = 24;
   const BUOY = 3.2; // buoy radius, world units (about 10 in at the swimmer's scale)
-  const CROWD = [11, 50.5], ACTION = [30, 96]; // world y-ranges of the redrawn strips
+  const CROWD = [11, 50.5], ACTION = [30, 114]; // world y-ranges of the redrawn strips (the action strip reaches the low fish band)
   // Five tiers of fans, back to front: [seat row y, fan scale]. Kept small so the stands read as far off.
   const TIERS = [[22, 0.28], [28, 0.33], [34.5, 0.39], [41.5, 0.46], [49, 0.54]];
   const layer = () => { const c = document.createElement('canvas'); root.appendChild(c); return { c, g: c.getContext('2d'), k: 1, top: 0 }; };
   root.textContent = '';
-  const still = layer(), crowd = layer(), action = layer(), tint = layer(), fx = layer();
-  let ray = null, blob = null, snow = [], fish = [], bubbles = [], fxAt = -1;
+  const still = layer(), crowd = layer(), tint = layer(), action = layer(), fx = layer(); // the tint sits under the action strip, whose colours are pre-tinted (see under)
+  let ray = null, blob = null, snow = [], fish = [], bubbles = [], fxAt = -1, fishD = 0;
   let x0 = 0, y0 = 0, wU = 120, u = 1, tile = null, fans = [], C = {};
   const off = (w, h) => { const c = document.createElement('canvas'); c.width = Math.max(1, Math.ceil(w)); c.height = Math.max(1, Math.ceil(h)); return c; };
   const world = (L, sx = 0, sy = 0) => L.g.setTransform(L.k, 0, 0, L.k, (sx - x0) * L.k, (sy - L.top) * L.k); // world units → layer pixels
   const rrect = (c, x, y, w, h, r) => { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); };
+  // A colour as seen through the water at world height y: blended with the tint gradient there
+  // (the same stops the tint layer uses), so the action strip needn't be tinted every frame.
+  const rgba = (c) => { if (c[0] === '#') { const n = parseInt(c.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255, 1]; } const m = c.match(/[\d.]+/g).map(Number); return [m[0], m[1], m[2], m[3] ?? 1]; };
+  function under(c, y) {
+    const st = [[0, C.waterTop], [0.55, C.waterMid], [1, C.waterDeep]], q = Math.min(1, Math.max(0, y / 120));
+    const i = q < 0.55 ? 0 : 1, s = (q - st[i][0]) / (st[i + 1][0] - st[i][0]), A = rgba(st[i][1]), Bc = rgba(st[i + 1][1]);
+    const w = A.map((v, j) => v + (Bc[j] - v) * s), col = rgba(c), a = w[3];
+    return `rgba(${[0, 1, 2].map((j) => Math.round(col[j] * (1 - a) + w[j] * a)).join(',')},${col[3]})`;
+  }
   // Size a layer to cover world y [top, bottom] at `scale` device pixels per css pixel.
   function place(L, top, bottom, scale, cssW) {
     L.top = top; L.k = u * scale;
@@ -817,7 +834,7 @@ function createBallpark(root, stage, onRebuild) {
     const cs = getComputedStyle(root), v = (n) => cs.getPropertyValue(n).trim();
     C = { skyTop: v('--sky-top'), skyLow: v('--sky-low'), facade: v('--facade'), stands: v('--stands'), seats: v('--seats'), wall: v('--wall'), wallCap: v('--wall-cap'),
       grass: v('--grass'), track: v('--track'), dirt: v('--dirt'), pebble: v('--pebble'), chalk: v('--chalk'), bag: v('--bag'), haze: v('--haze'), dust: v('--dust'), lights: v('--lights') === '1',
-      waterTop: v('--water-top'), waterMid: v('--water-mid'), waterDeep: v('--water-deep'), fish: v('--fish'),
+      waterTop: v('--water-top'), waterMid: v('--water-mid'), waterDeep: v('--water-deep'),
       buoy: v('--red'), tether: v('--tether'), anchor: v('--anchor'), outline: v('--outline') };
 
     // The still layer: sky, lights, upper deck, empty stands, wall and grass.
@@ -855,6 +872,8 @@ function createBallpark(root, stage, onRebuild) {
     world(tint); const wg = tint.g.createLinearGradient(0, 0, 0, 120);
     wg.addColorStop(0, C.waterTop); wg.addColorStop(0.55, C.waterMid); wg.addColorStop(1, C.waterDeep);
     tint.g.fillStyle = wg; tint.g.fillRect(x0, y0, wU, bottom - y0);
+    // Things on the action strip get the same water tint baked into their colours, for their depth.
+    for (const [k, y] of [['dirt', PATH], ['pebble', PATH], ['chalk', PATH], ['dust', PATH - 3], ['bag', 64], ['buoy', 64], ['tether', 75], ['anchor', PATH], ['outline', 64]]) C[k] = under(C[k], y);
     ray = off(32, 128); { const rg = ray.getContext('2d'), h = rg.createLinearGradient(0, 0, 32, 0);
       h.addColorStop(0, 'rgba(255,255,255,0)'); h.addColorStop(0.5, 'rgba(235,255,255,1)'); h.addColorStop(1, 'rgba(255,255,255,0)');
       rg.fillStyle = h; rg.fillRect(0, 0, 32, 128); rg.globalCompositeOperation = 'destination-in';
@@ -862,7 +881,7 @@ function createBallpark(root, stage, onRebuild) {
     blob = off(32, 32); { const bg = blob.getContext('2d'), gr = bg.createRadialGradient(16, 16, 0, 16, 16, 16);
       gr.addColorStop(0, 'rgba(230,255,255,1)'); gr.addColorStop(1, 'rgba(230,255,255,0)'); bg.fillStyle = gr; bg.fillRect(0, 0, 32, 32); }
     snow = Array.from({ length: Math.round(wU * 0.7) }, () => ({ x: x0 + rnd() * wU, y: y0 + rnd() * (bottom - y0), r: 0.12 + rnd() * 0.25, depth: 0.2 + rnd() * 0.6, ph: rnd() * 6.3 }));
-    fish = Array.from({ length: 3 }, (_, i) => ({ y: 18 + i * 9 + rnd() * 4, size: 1.6 + rnd() * 1.6, v: (2 + rnd() * 2.5) * (rnd() < 0.5 ? -1 : 1), x: x0 + rnd() * wU, ph: rnd() * 6.3 }));
+    fish = FISH_BANDS.map((band, i) => newFish(band, x0 + wU * (0.2 + 0.3 * i)));
 
     // One tile of base path dirt with pebbles.
     tile = off(TILE * action.k, 15 * action.k); const t = tile.getContext('2d'); t.setTransform(action.k, 0, 0, action.k, 0, 0);
@@ -936,7 +955,8 @@ function createBallpark(root, stage, onRebuild) {
       puffs.push({ x: x + side * (0.5 + rnd() * spread), y: PATH - 1 - rnd(), vx: Math.cos(a) * sp * side, vy: -Math.sin(a) * sp * 0.6, r: 0.8 + rnd() * 1.1, born: t, life: 1.4 + rnd() * 1.4, d0: null, c: rnd() < 0.6 ? C.dust : C.dirt });
     }
   }
-  function front(g, d, t) {
+  function front(g, d, t) { silt(g, d, t); swimmers(g, d, t); } // the fish are close to the camera, so they skip the tint
+  function silt(g, d, t) {
     if (!puffs.length) return;
     puffs = puffs.filter((q) => t >= q.born && t - q.born < q.life);
     for (const q of puffs) {
@@ -952,7 +972,39 @@ function createBallpark(root, stage, onRebuild) {
   function bubble(x, y, n, t, spread = 1) {
     for (let i = 0; i < n; i++) bubbles.push({ x: x + (rnd() - 0.5) * spread, y: y + (rnd() - 0.5) * spread, r: 0.45 + rnd() * 0.75, vy: 5 + rnd() * 6, ph: rnd() * 6.3, born: t + i * 0.04, d0: null });
   }
-  // The water layer, redrawn up to 30 times a second: light rays, caustics on the field, marine snow, fish and bubbles.
+  // Fish, drawn on the sharp action layer after the swimmer so they pass in front of him.
+  let fishT = 0;
+  function swimmers(g, d, t) {
+    const dt = Math.min(0.1, Math.max(0, t - fishT)); fishT = t;
+    const moved = d - fishD; fishD = d;
+    for (let i = 0; i < fish.length; i++) { // foreground fish, in front of everything, tails beating
+      const fi = fish[i]; fi.x += fi.v * dt - moved * 1.3; // closer than the field, so the ground's motion carries them further
+      if (fi.x < x0 - 14 || fi.x > x0 + wU + 14) { fish[i] = newFish(fi.band, fi.x < x0 ? x0 + wU + 12 : x0 - 12); continue; }
+      const dir = Math.sign(fi.v), s = fi.size, wag = Math.sin(t * 7 + fi.ph) * 0.3, y = fi.y + Math.sin(t * 0.8 + fi.ph) * 1.5;
+      g.save(); g.translate(fi.x, y); g.scale(dir * s, s); g.globalAlpha = 1;
+      g.fillStyle = fi.body; // tail (wagging), body, back fin
+      g.beginPath(); g.moveTo(-1.2, 0); g.lineTo(-2.1, -0.65 + wag); g.lineTo(-1.95, wag * 0.6); g.lineTo(-2.1, 0.65 + wag); g.closePath(); g.fill();
+      g.beginPath(); g.ellipse(0, 0, 1.45, 0.72, 0, 0, 2 * Math.PI); g.fill();
+      g.beginPath(); g.moveTo(-0.5, -0.62); g.quadraticCurveTo(0, -1.15, 0.5, -0.66); g.closePath(); g.fill();
+      g.save(); g.beginPath(); g.ellipse(0, 0, 1.45, 0.72, 0, 0, 2 * Math.PI); g.clip(); // a stripe and a belly shine
+      g.fillStyle = fi.stripe; g.fillRect(-0.15, -1, 0.42, 2);
+      g.fillStyle = 'rgba(255,255,255,0.25)'; g.beginPath(); g.ellipse(0.1, 0.35, 1.1, 0.3, 0, 0, 2 * Math.PI); g.fill(); g.restore();
+      g.strokeStyle = 'rgba(10,30,40,0.55)'; g.lineWidth = 0.07; g.beginPath(); g.ellipse(0, 0, 1.45, 0.72, 0, 0, 2 * Math.PI); g.stroke();
+      g.fillStyle = '#ffffff'; g.beginPath(); g.arc(0.85, -0.15, 0.2, 0, 2 * Math.PI); g.fill(); // eye
+      g.fillStyle = '#10202a'; g.beginPath(); g.arc(0.9, -0.15, 0.11, 0, 2 * Math.PI); g.fill();
+      g.restore();
+    }
+    g.globalAlpha = 1;
+  }
+  // Foreground fish: big and close to the camera, so they drift past faster than the field; one
+  // in each of three bands: up high, at the swimmer's level, and down by Run.
+  const FISH_BANDS = [[36, 46], [56, 70], [96, 108]];
+  const FISH_COLS = [['#e8314f', '#fff3dc'], ['#89cff0', '#1f6fa3'], ['#f7c948', '#f07c24'], ['#f59a3a', '#ffffff'], ['#9a7ef0', '#f7c948']];
+  function newFish(band, x) {
+    const [body, stripe] = pick(FISH_COLS);
+    return { band, x, y: band[0] + rnd() * (band[1] - band[0]), size: 3.2 + rnd() * 2.6, v: (4 + rnd() * 5) * (rnd() < 0.5 ? -1 : 1), ph: rnd() * 6.3, body, stripe };
+  }
+  // The water layer, redrawn up to 30 times a second: light rays, caustics on the field, marine snow and bubbles.
   function water(d, t) {
     if (Math.abs(t - fxAt) < 0.033) return;
     const dt = Math.min(0.1, Math.max(0, t - fxAt)); fxAt = t;
@@ -976,13 +1028,6 @@ function createBallpark(root, stage, onRebuild) {
       const x = ((sn.x - d * sn.depth - x0) % wU + wU) % wU + x0 + 0.6 * Math.sin(t * 0.5 + sn.ph);
       g.globalAlpha = 0.18 + 0.25 * sn.depth; g.beginPath(); g.arc(x, sn.y, sn.r, 0, 2 * Math.PI); g.fill();
     }
-    g.fillStyle = C.fish;
-    for (const fi of fish) { // fish cruising over the stands, tails beating
-      fi.x += fi.v * dt; if (fi.x > x0 + wU + 8) fi.x = x0 - 8; if (fi.x < x0 - 8) fi.x = x0 + wU + 8;
-      const dir = Math.sign(fi.v), s = fi.size, wag = Math.sin(t * 6 + fi.ph) * 0.35 * s, y = fi.y + Math.sin(t * 0.8 + fi.ph) * 1.2;
-      g.globalAlpha = 0.55; g.beginPath(); g.ellipse(fi.x, y, 1.6 * s, 0.6 * s, 0, 0, 2 * Math.PI); g.fill();
-      g.beginPath(); g.moveTo(fi.x - dir * 1.3 * s, y); g.lineTo(fi.x - dir * 2.4 * s, y - 0.6 * s + wag); g.lineTo(fi.x - dir * 2.4 * s, y + 0.6 * s + wag); g.closePath(); g.fill();
-    }
     bubbles = bubbles.filter((b) => b.y > y0 - 2);
     g.lineWidth = 0.18;
     for (const b of bubbles) { // bubbles wobbling up: a clear body, a bright rim and a highlight
@@ -999,5 +1044,5 @@ function createBallpark(root, stage, onRebuild) {
   const again = () => { ready = false; crowdAt = fxAt = -1; onRebuild(); };
   if (window.ResizeObserver) { const ro = new ResizeObserver(again); ro.observe(root); if (stage !== root) ro.observe(stage); }
   matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', again);
-  return { draw, front, tag, puff, bubble, cheer: (level) => { hypeTo = level; }, span: () => [x0, x0 + wU], path: PATH, runX: 56 };
+  return { draw, front, tag, puff, bubble, under: (c, y) => (C.waterTop ? under(c, y) : c), cheer: (level) => { hypeTo = level; }, span: () => [x0, x0 + wU], path: PATH, runX: 56 };
 }
