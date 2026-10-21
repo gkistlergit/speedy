@@ -681,9 +681,9 @@ function createBallpark(root, stage, onRebuild) {
   // drift back with the ground (they hang in the air while the runner moves on).
   let puffs = [];
   function dust(x, t) {
-    for (let i = 0; i < 34; i++) {
-      const a = Math.PI * (0.04 + 0.92 * rnd()), sp = 5 + rnd() * 13, side = rnd() < 0.5 ? -1 : 1;
-      puffs.push({ x: x + side * (0.5 + rnd() * 4), y: PATH - 1 - rnd() * 1.5, vx: Math.cos(a) * sp * side, vy: -Math.sin(a) * sp * 0.75, r: 0.9 + rnd() * 1.3, born: t, life: 0.7 + rnd() * 0.7, d0: null, c: rnd() < 0.65 ? C.dust : C.dirt });
+    for (let i = 0; i < 12; i++) {
+      const a = Math.PI * (0.06 + 0.88 * rnd()), sp = 4 + rnd() * 8, side = rnd() < 0.5 ? -1 : 1;
+      puffs.push({ x: x + side * (0.5 + rnd() * 3.5), y: PATH - 1 - rnd(), vx: Math.cos(a) * sp * side, vy: -Math.sin(a) * sp * 0.5, r: 0.6 + rnd() * 0.8, born: t, life: 0.45 + rnd() * 0.4, d0: null, c: rnd() < 0.65 ? C.dust : C.dirt });
     }
   }
   function front(g, d, t) {
@@ -692,9 +692,9 @@ function createBallpark(root, stage, onRebuild) {
     for (const q of puffs) {
       if (q.d0 === null) q.d0 = d;
       const age = (t - q.born) / q.life, e = 1 - (1 - age) ** 2; // fast out, slowing down
-      const x = q.x + q.vx * e * q.life - (d - q.d0), y = q.y + q.vy * e * q.life - 2.5 * age;
-      g.globalAlpha = 0.7 * (1 - age) ** 1.3; g.fillStyle = q.c;
-      g.beginPath(); g.arc(x, y, q.r * (1 + 3 * age), 0, 2 * Math.PI); g.fill();
+      const x = q.x + q.vx * e * q.life - (d - q.d0), y = q.y + q.vy * e * q.life - 1.2 * age;
+      g.globalAlpha = 0.45 * (1 - age) ** 1.5; g.fillStyle = q.c;
+      g.beginPath(); g.arc(x, y, q.r * (1 + 2 * age), 0, 2 * Math.PI); g.fill();
     }
     g.globalAlpha = 1;
   }
