@@ -425,7 +425,7 @@ export function sparkline(canvas, values, color) {
 // Speed tab: as one SVG the whole scene was redrawn on every change, which ran
 // at ~4 fps on iPhone; here only the runner, the crowd's bounce and the dirt move.
 export function createRunner(root, stage = root) {
-  const CYCLE = 0.675;                        // seconds per stride (two steps), ~178 steps/min
+  const CYCLE = 1.0;                          // seconds per stride (two steps): slowed by the water
   const GROUND = 104, HIP_X = 57, LEAN = 11;  // lean in degrees, top tilted forward
   const L = { thigh: 19.5, shin: 19, torso: 22.5, neck: 3.2, upper: 13.5, fore: 12 };
   const STANCE = 0.34;                        // fraction of the cycle a foot is on the ground
@@ -513,7 +513,7 @@ export function createRunner(root, stage = root) {
   for (const start of [STANCE, 0.5 + STANCE]) { // fill the two flight phases
     const i0 = Math.round(start * N), i1 = Math.round((start - STANCE + 0.5) * N) % N;
     const y0 = hipY[i0 - 1], y1 = hipY[i1], span = (i1 - i0 + N) % N;
-    for (let j = 0; j < span; j++) { const s = j / span; hipY[(i0 + j) % N] = y0 + (y1 - y0) * s - 3 * Math.sin(Math.PI * s); }
+    for (let j = 0; j < span; j++) { const s = j / span; hipY[(i0 + j) % N] = y0 + (y1 - y0) * s - 7 * Math.sin(Math.PI * s); } // floaty hang time underwater
   }
   const footX = (p) => legPose(p, [0.9 * twist(p), 0]).a[0];
   const speed = (footX(0.02) - footX(STANCE - 0.02)) / ((STANCE - 0.04) * CYCLE); // units per second
@@ -611,7 +611,8 @@ export function createRunner(root, stage = root) {
   // he goes down: dives, belly-flops with a bounce and a burst of dust, skids with his lower legs
   // kicking up behind him until he stops, lies there a beat, pushes up to hands and knees, comes
   // up on one knee, rises into a crouch and sprints off again.
-  const FALL_CHANCE = 0.35, STUMBLE = 0.9, RISE = 1.4, RESUME_P = 0.82; // RESUME_P: the stride phase closest to the crouch
+  const FALL_CHANCE = 0.35, STUMBLE = 1.3, RISE = 2.0, RESUME_P = 0.82; // RESUME_P: the stride phase closest to the crouch
+  const SLOW = 1.45; // underwater, the fall and get-up play out this much slower
   const PRONE = { air: 0, lean: 88, hn: -86, kn: 18, an: -30, hf: -82, kf: 32, af: -30, sn: 100, en: 25, sf: 92, ef: 30, tw: 0, head: 55 };
   const kick = (kn, kf) => ({ ...PRONE, kn, kf, an: -40, af: -40, sn: 104, en: 20, sf: 96, ef: 26 }); // skidding, lower legs flicking up
   const FALL = [
@@ -632,6 +633,7 @@ export function createRunner(root, stage = root) {
   // Ground speed as a share of full speed, s seconds into the current move.
   function pace(mode, s) {
     if (mode === 'stumble') return 1 - 0.4 * Math.sin(Math.PI * Math.min(1, s / STUMBLE));
+    if (mode === 'fall') s /= SLOW;
     if (mode === 'fall') return s < 0.66 ? 1 - 0.15 * s / 0.66 : s < 1.5 ? 0.6 * (1 - (s - 0.66) / 0.84) ** 1.6 : 0; // the plop costs speed, then he skids to a stop
     if (mode === 'rise') return 0.15 + 0.85 * ease(s / RISE);
     return 1;
@@ -685,18 +687,18 @@ export function createRunner(root, stage = root) {
   // dist: ground scrolled past the camera; ran: ground he's covered (they differ only as he
   // sprints off screen, when the camera stops following and xo is how far ahead he's got).
   let raf = 0, t0 = 0, lastT = 0, dist = 0, ran = 0, xo = 0, pAt = 0, distAt = 0, baseX = null, toTrip = roll();
-  let mode = 'run', mT = 0, keys = null, Jlast = null, puffed = 0, gone = null, blendIn = 0;
+  let mode = 'run', mT = 0, keys = null, Jlast = null, puffed = 0, gone = null, blendIn = 0, breath = 1;
   const phase = () => pAt + (ran - distAt) / SL;
   function draw(t) {
     const dt = Math.min(0.1, Math.max(0, t - lastT)); lastT = t;
     if (mode === 'stumble' && t - mT >= STUMBLE) mode = 'run';
-    if (mode === 'fall' && t - mT >= FALL_END) { mode = 'rise'; mT = t; pAt = RESUME_P; distAt = ran; }
+    if (mode === 'fall' && t - mT >= FALL_END * SLOW) { mode = 'rise'; mT = t; pAt = RESUME_P; distAt = ran; }
     if (mode === 'rise' && t - mT >= RISE) mode = 'run';
     // The crowd goes wild while he's down and getting up, gasps at a stumble, cheers him off, and calms down after.
     park.cheer(mode === 'fall' || mode === 'rise' ? 1 : mode === 'exit' ? 0.7 : mode === 'stumble' ? 0.45 : 0);
     const p0 = phase();
     if (mode === 'exit') { // the camera stops following; he accelerates away
-      const s = t - mT, cam = Math.max(0, 1 - s / 0.4), boost = 1 + 0.8 * Math.min(1, s / 0.6);
+      const s = t - mT, cam = Math.max(0, 1 - s / 0.4), boost = 1 + 0.9 * Math.min(1, s / 0.7);
       dist += speed * K * cam * dt; ran += speed * K * boost * dt; xo += speed * K * (boost - cam) * dt;
       if (baseX !== null) baseX -= speed * K * cam * dt;
     } else {
@@ -722,7 +724,7 @@ export function createRunner(root, stage = root) {
     }
     let J;
     if (mode === 'fall') {
-      const st = t - mT; let i = 0; while (i < keys.length - 2 && keys[i + 1][0] <= st) i++;
+      const st = (t - mT) / SLOW; let i = 0; while (i < keys.length - 2 && keys[i + 1][0] <= st) i++;
       const [a0, ja] = keys[i], [a1, jb] = keys[i + 1];
       J = Jlast = mix(ja, jb, ease((st - a0) / (a1 - a0)));
     } else {
@@ -734,9 +736,18 @@ export function createRunner(root, stage = root) {
     if (!ctx) return;
     const B = pose(J);
     // Dust where he belly-flops, where he lands again, and along the skid.
+    const wy = (y) => park.path - GROUND * K + y * K; // runner frame → world y
     if (mode === 'fall') {
-      const st = t - mT, chest = ox + xo + lerp(B.base, B.top, 0.6)[0] * K;
-      for (const [at, n] of [[0.66, 22], [0.86, 12], [1.0, 6], [1.14, 6], [1.28, 4], [1.42, 3]]) if (puffed < at && st >= at) { park.puff(chest, t, n, 8); puffed = at; }
+      const st = (t - mT) / SLOW, chest = lerp(B.base, B.top, 0.6), cx = ox + xo + chest[0] * K;
+      for (const [at, n] of [[0.66, 22], [0.86, 12], [1.0, 6], [1.14, 6], [1.28, 4], [1.42, 3]]) if (puffed < at && st >= at) {
+        park.puff(cx, t, n, 8); if (at < 0.9) park.bubble(cx, wy(chest[1]) - 2, at < 0.7 ? 14 : 6, t, 6); puffed = at;
+      }
+    }
+    // He breathes out a few bubbles every couple of seconds.
+    if (raf && t >= breath) {
+      const m = rot(B.nt, J.head, [5.4, -2.4]);
+      park.bubble(ox + xo + m[0] * K, wy(m[1]), 3 + Math.floor(Math.random() * 3), t, 0.6);
+      breath = t + 1.4 + Math.random() * 1.2;
     }
     ctx.save(); ctx.translate(ox + xo, park.path - GROUND * K); ctx.scale(K, K);
     render(ctx); ctx.restore();
@@ -778,6 +789,10 @@ export function createRunner(root, stage = root) {
 // painted once; the crowd strip is redrawn at screen resolution (soft, like a
 // shallow depth of field) from one pre-rendered sprite per fan; and a strip
 // holding the base path and the runner is redrawn at full sharpness.
+// Underwater: the whole park is on the sea floor. A blue-green tint deepens toward the
+// bottom, light rays sway down from the surface, caustics flicker on the field, specks of
+// marine snow drift past, a few fish cruise over the stands, bubbles rise, and the base
+// path kicks up slow, lingering clouds of silt instead of dust.
 function createBallpark(root, stage, onRebuild) {
   const PATH = 86, TILE = 24;
   // The base to scale with the runner (about 6 ft = 47 units, so ~0.65 units an inch): 18 in across, ~3 in thick.
@@ -787,7 +802,8 @@ function createBallpark(root, stage, onRebuild) {
   const TIERS = [[22, 0.28], [28, 0.33], [34.5, 0.39], [41.5, 0.46], [49, 0.54]];
   const layer = () => { const c = document.createElement('canvas'); root.appendChild(c); return { c, g: c.getContext('2d'), k: 1, top: 0 }; };
   root.textContent = '';
-  const still = layer(), crowd = layer(), action = layer();
+  const still = layer(), crowd = layer(), action = layer(), tint = layer(), fx = layer();
+  let ray = null, blob = null, snow = [], fish = [], bubbles = [], fxAt = -1;
   let x0 = 0, y0 = 0, wU = 120, u = 1, tile = null, fans = [], C = {};
   const off = (w, h) => { const c = document.createElement('canvas'); c.width = Math.max(1, Math.ceil(w)); c.height = Math.max(1, Math.ceil(h)); return c; };
   const world = (L, sx = 0, sy = 0) => L.g.setTransform(L.k, 0, 0, L.k, (sx - x0) * L.k, (sy - L.top) * L.k); // world units → layer pixels
@@ -842,9 +858,12 @@ function createBallpark(root, stage, onRebuild) {
     place(still, y0, y0 + r.height / u, dpr, r.width);
     place(crowd, CROWD[0], CROWD[1], 0.75, r.width); // below screen resolution: the stands sit out of focus
     place(action, ACTION[0], ACTION[1], dpr, r.width);
+    const bottom = y0 + r.height / u;
+    place(tint, y0, bottom, 0.5, r.width); place(fx, y0, bottom, 0.6, r.width); // soft by nature, so drawn below screen resolution
     const cs = getComputedStyle(root), v = (n) => cs.getPropertyValue(n).trim();
     C = { skyTop: v('--sky-top'), skyLow: v('--sky-low'), facade: v('--facade'), stands: v('--stands'), seats: v('--seats'), wall: v('--wall'), wallCap: v('--wall-cap'),
-      grass: v('--grass'), track: v('--track'), dirt: v('--dirt'), pebble: v('--pebble'), chalk: v('--chalk'), bag: v('--bag'), bagTop: v('--bag-top'), haze: v('--haze'), dust: v('--dust'), scuff: v('--scuff'), lights: v('--lights') === '1' };
+      grass: v('--grass'), track: v('--track'), dirt: v('--dirt'), pebble: v('--pebble'), chalk: v('--chalk'), bag: v('--bag'), bagTop: v('--bag-top'), haze: v('--haze'), dust: v('--dust'), scuff: v('--scuff'), lights: v('--lights') === '1',
+      waterTop: v('--water-top'), waterMid: v('--water-mid'), waterDeep: v('--water-deep'), fish: v('--fish') };
 
     // The still layer: sky, lights, upper deck, empty stands, wall and grass.
     const g = still.g; world(still);
@@ -875,6 +894,21 @@ function createBallpark(root, stage, onRebuild) {
       for (let x = x0 - 4 + rnd() * step; x < x0 + wU + 4; x += step * (0.9 + rnd() * 0.25)) fans.push({ x, y, ...fanSprite(sc, sc > 0.42) });
     }
 
+    // The water: a tint over everything, deeper toward the bottom; sprites for light rays and caustics;
+    // marine snow and fish spread across the screen.
+    tint.g.setTransform(1, 0, 0, 1, 0, 0); tint.g.clearRect(0, 0, tint.c.width, tint.c.height); // rebuilds mustn't stack the tint
+    world(tint); const wg = tint.g.createLinearGradient(0, 0, 0, 120);
+    wg.addColorStop(0, C.waterTop); wg.addColorStop(0.55, C.waterMid); wg.addColorStop(1, C.waterDeep);
+    tint.g.fillStyle = wg; tint.g.fillRect(x0, y0, wU, bottom - y0);
+    ray = off(32, 128); { const rg = ray.getContext('2d'), h = rg.createLinearGradient(0, 0, 32, 0);
+      h.addColorStop(0, 'rgba(255,255,255,0)'); h.addColorStop(0.5, 'rgba(235,255,255,1)'); h.addColorStop(1, 'rgba(255,255,255,0)');
+      rg.fillStyle = h; rg.fillRect(0, 0, 32, 128); rg.globalCompositeOperation = 'destination-in';
+      const vg = rg.createLinearGradient(0, 0, 0, 128); vg.addColorStop(0, 'rgba(0,0,0,1)'); vg.addColorStop(0.55, 'rgba(0,0,0,0.55)'); vg.addColorStop(1, 'rgba(0,0,0,0)'); rg.fillStyle = vg; rg.fillRect(0, 0, 32, 128); }
+    blob = off(32, 32); { const bg = blob.getContext('2d'), gr = bg.createRadialGradient(16, 16, 0, 16, 16, 16);
+      gr.addColorStop(0, 'rgba(230,255,255,1)'); gr.addColorStop(1, 'rgba(230,255,255,0)'); bg.fillStyle = gr; bg.fillRect(0, 0, 32, 32); }
+    snow = Array.from({ length: Math.round(wU * 0.7) }, () => ({ x: x0 + rnd() * wU, y: y0 + rnd() * (bottom - y0), r: 0.12 + rnd() * 0.25, depth: 0.2 + rnd() * 0.6, ph: rnd() * 6.3 }));
+    fish = Array.from({ length: 3 }, (_, i) => ({ y: 18 + i * 9 + rnd() * 4, size: 1.6 + rnd() * 1.6, v: (2 + rnd() * 2.5) * (rnd() < 0.5 ? -1 : 1), x: x0 + rnd() * wU, ph: rnd() * 6.3 }));
+
     // One tile of base path dirt with pebbles.
     tile = off(TILE * action.k, 15 * action.k); const t = tile.getContext('2d'); t.setTransform(action.k, 0, 0, action.k, 0, 0);
     t.fillStyle = C.dirt; t.fillRect(0, 0, TILE, 15); t.fillStyle = C.pebble;
@@ -898,14 +932,14 @@ function createBallpark(root, stage, onRebuild) {
       const dt = Math.min(0.1, Math.max(0, t - crowdAt));
       crowdAt = t;
       hype += (hypeTo - hype) * Math.min(1, dt * (hypeTo > hype ? 6 : 1.2)); // erupts fast, settles slowly
-      beat += dt * (1 + 0.9 * hype);
+      beat += dt * 0.6 * (1 + 0.9 * hype); // slower underwater
       g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, crowd.c.width, crowd.c.height);
       world(crowd); g.fillStyle = C.seats;
       for (const [y, sc] of TIERS) g.fillRect(x0, y - 3.2 * sc, wU, 3.2 * sc);
       for (const fn of fans) {
         const ph = (beat / fn.period + fn.phase) % 1, hop = Math.sin(Math.PI * ph) ** 2;
         world(crowd, fn.x, fn.y);
-        g.translate(0, -fn.sc * (3.4 * hop * (1 + 2.2 * hype) + 2.8 * hype)); g.rotate((0.06 + 0.14 * hype) * fn.sway * Math.sin(2 * Math.PI * ph));
+        g.translate(0, -fn.sc * (3.4 * hop * (1 + 2.2 * hype) + 2.8 * hype)); g.rotate((0.1 + 0.18 * hype) * fn.sway * Math.sin(2 * Math.PI * ph)); // sway like they're in water
         g.drawImage(fn.img, -6 * fn.sc, -15.5 * fn.sc, 12 * fn.sc, 17 * fn.sc);
       }
       world(crowd); g.fillStyle = C.haze; g.fillRect(x0, CROWD[0], wU, CROWD[1] - CROWD[0]); // aerial haze pushes the stands back
@@ -938,16 +972,17 @@ function createBallpark(root, stage, onRebuild) {
       for (const sx of [-2.2, -1, 0.4, 1.6]) { g.beginPath(); g.arc(sx, -0.55, 0.22, 0, 2 * Math.PI); g.fill(); }
     }
     world(action);
+    water(d, t);
     return g;
   }
-  // Dust kicked off the bag (and the impact above): chalky puffs that billow out, rise, spread and fade, and
-  // drift back with the ground (they hang in the air while the runner moves on).
+  // Silt kicked off the bag (and the impact above): soft clouds that billow out slowly, drift up, spread and
+  // linger, and drift back with the ground (they hang in the water while the runner moves on).
   let puffs = [], hitAt = -9, scuffed = false, lastBx = 0;
   const dust = (x, t) => { hitAt = t; scuffed = true; puff(x, t, 12, BAG * 0.42); };
   function puff(x, t, n, spread) {
     for (let i = 0; i < n; i++) {
-      const a = Math.PI * (0.06 + 0.88 * rnd()), sp = 4 + rnd() * 8, side = rnd() < 0.5 ? -1 : 1;
-      puffs.push({ x: x + side * (0.5 + rnd() * spread), y: PATH - 1 - rnd(), vx: Math.cos(a) * sp * side, vy: -Math.sin(a) * sp * 0.5, r: 0.6 + rnd() * 0.8, born: t, life: 0.45 + rnd() * 0.4, d0: null, c: rnd() < 0.65 ? C.dust : C.dirt });
+      const a = Math.PI * (0.06 + 0.88 * rnd()), sp = 2 + rnd() * 4, side = rnd() < 0.5 ? -1 : 1;
+      puffs.push({ x: x + side * (0.5 + rnd() * spread), y: PATH - 1 - rnd(), vx: Math.cos(a) * sp * side, vy: -Math.sin(a) * sp * 0.6, r: 0.8 + rnd() * 1.1, born: t, life: 1.4 + rnd() * 1.4, d0: null, c: rnd() < 0.6 ? C.dust : C.dirt });
     }
   }
   function front(g, d, t) {
@@ -956,14 +991,62 @@ function createBallpark(root, stage, onRebuild) {
     for (const q of puffs) {
       if (q.d0 === null) q.d0 = d;
       const age = (t - q.born) / q.life, e = 1 - (1 - age) ** 2; // fast out, slowing down
-      const x = q.x + q.vx * e * q.life - (d - q.d0), y = q.y + q.vy * e * q.life - 1.2 * age;
-      g.globalAlpha = 0.45 * (1 - age) ** 1.5; g.fillStyle = q.c;
-      g.beginPath(); g.arc(x, y, q.r * (1 + 2 * age), 0, 2 * Math.PI); g.fill();
+      const x = q.x + q.vx * e * q.life * 0.6 - (d - q.d0), y = q.y + q.vy * e * q.life * 0.6 - 3 * age; // drag, then a slow rise
+      g.globalAlpha = 0.38 * (1 - age) ** 1.2; g.fillStyle = q.c;
+      g.beginPath(); g.arc(x, y, q.r * (1 + 3 * age), 0, 2 * Math.PI); g.fill();
     }
     g.globalAlpha = 1;
   }
-  const again = () => { ready = false; crowdAt = -1; onRebuild(); };
+  // Bubbles released at (x, y): they wobble up to the surface and stay put as the ground moves on.
+  function bubble(x, y, n, t, spread = 1) {
+    for (let i = 0; i < n; i++) bubbles.push({ x: x + (rnd() - 0.5) * spread, y: y + (rnd() - 0.5) * spread, r: 0.45 + rnd() * 0.75, vy: 5 + rnd() * 6, ph: rnd() * 6.3, born: t + i * 0.04, d0: null });
+  }
+  // The water layer, redrawn up to 40 times a second: light rays, caustics on the field, marine snow, fish and bubbles.
+  function water(d, t) {
+    if (Math.abs(t - fxAt) < 0.025) return;
+    const dt = Math.min(0.1, Math.max(0, t - fxAt)); fxAt = t;
+    const g = fx.g, bottom = fx.top + fx.c.height / fx.k;
+    g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, fx.c.width, fx.c.height);
+    world(fx); g.globalCompositeOperation = 'lighter';
+    const nr = Math.max(3, Math.round(wU / 28));
+    for (let i = 0; i < nr; i++) { // god rays swaying down from the surface
+      const x = x0 + wU * (i + 0.5) / nr + 7 * Math.sin(t * 0.13 + i * 1.7);
+      g.globalAlpha = 0.3 + 0.12 * Math.sin(t * 0.5 + i * 2.1);
+      g.save(); g.translate(x, -4); g.rotate(0.18 + 0.05 * Math.sin(t * 0.2 + i)); g.drawImage(ray, -9 - i % 2 * 4, 0, 18 + i % 3 * 8, 115); g.restore();
+    }
+    for (let i = 0; i < 26; i++) { // caustics: soft light patches flickering on the field
+      const cx = x0 + ((i * 37.7) % wU) + 3 * Math.sin(t * 0.7 + i), cy = 60 + ((i * 13.3) % 38) + 1.5 * Math.cos(t * 0.6 + i * 1.3);
+      const w = 5 + (i % 4) * 1.5, a = 0.1 + 0.12 * (0.5 + 0.5 * Math.sin(t * 1.3 + i * 2.3));
+      g.globalAlpha = a; g.drawImage(blob, cx - w, cy - w * 0.35, w * 2, w * 0.7);
+    }
+    g.globalCompositeOperation = 'source-over'; g.fillStyle = 'rgba(225,245,250,1)';
+    for (const sn of snow) { // marine snow drifting down and back with the ground
+      sn.y += dt * (0.6 + sn.depth); if (sn.y > bottom) sn.y = y0;
+      const x = ((sn.x - d * sn.depth - x0) % wU + wU) % wU + x0 + 0.6 * Math.sin(t * 0.5 + sn.ph);
+      g.globalAlpha = 0.18 + 0.25 * sn.depth; g.beginPath(); g.arc(x, sn.y, sn.r, 0, 2 * Math.PI); g.fill();
+    }
+    g.fillStyle = C.fish;
+    for (const fi of fish) { // fish cruising over the stands, tails beating
+      fi.x += fi.v * dt; if (fi.x > x0 + wU + 8) fi.x = x0 - 8; if (fi.x < x0 - 8) fi.x = x0 + wU + 8;
+      const dir = Math.sign(fi.v), s = fi.size, wag = Math.sin(t * 6 + fi.ph) * 0.35 * s, y = fi.y + Math.sin(t * 0.8 + fi.ph) * 1.2;
+      g.globalAlpha = 0.55; g.beginPath(); g.ellipse(fi.x, y, 1.6 * s, 0.6 * s, 0, 0, 2 * Math.PI); g.fill();
+      g.beginPath(); g.moveTo(fi.x - dir * 1.3 * s, y); g.lineTo(fi.x - dir * 2.4 * s, y - 0.6 * s + wag); g.lineTo(fi.x - dir * 2.4 * s, y + 0.6 * s + wag); g.closePath(); g.fill();
+    }
+    bubbles = bubbles.filter((b) => b.y > y0 - 2);
+    g.lineWidth = 0.18;
+    for (const b of bubbles) { // bubbles wobbling up: a clear body, a bright rim and a highlight
+      if (t < b.born) continue;
+      if (b.d0 === null) b.d0 = d;
+      b.y -= b.vy * dt; b.r = Math.min(1.4, b.r * (1 + dt * 0.08));
+      const x = b.x - (d - b.d0) + 0.5 * Math.sin(t * 5 + b.ph);
+      g.globalAlpha = 0.35; g.fillStyle = 'rgba(210,245,255,1)'; g.beginPath(); g.arc(x, b.y, b.r, 0, 2 * Math.PI); g.fill();
+      g.globalAlpha = 0.9; g.strokeStyle = 'rgba(240,253,255,1)'; g.stroke();
+      g.globalAlpha = 0.9; g.fillStyle = '#ffffff'; g.beginPath(); g.arc(x - b.r * 0.35, b.y - b.r * 0.35, b.r * 0.25, 0, 2 * Math.PI); g.fill();
+    }
+    g.globalAlpha = 1;
+  }
+  const again = () => { ready = false; crowdAt = fxAt = -1; onRebuild(); };
   if (window.ResizeObserver) { const ro = new ResizeObserver(again); ro.observe(root); if (stage !== root) ro.observe(stage); }
   matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', again);
-  return { draw, front, dust, puff, cheer: (level) => { hypeTo = level; }, span: () => [x0, x0 + wU], path: PATH, runX: 56 };
+  return { draw, front, dust, puff, bubble, cheer: (level) => { hypeTo = level; }, span: () => [x0, x0 + wU], path: PATH, runX: 56 };
 }
