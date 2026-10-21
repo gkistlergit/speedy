@@ -512,7 +512,7 @@ export function createRunner(root, stage = root) {
 
   // One frame's drawing, back to front: [colour key, path data, far side?, stroke width?].
   // Uniform: cream jersey and pants with red piping, red belt, socks and helmet,
-  // red cleats with black soles and spikes, navy batting gloves with red straps.
+  // red cleats with black soles and spikes, red batting gloves with cream straps, a red collar trim.
   let ops = [];
   const fill = (key, d, far) => ops.push([key, d, far]);
   const stroke = (key, d, far, w) => ops.push([key, d, far, w]);
@@ -532,7 +532,7 @@ export function createRunner(root, stage = root) {
     fill('skin', limb(s, e, [[0, 2.7, 2.9], [0.5, 2.2, 2.4], [1, 1.75, 1.85]]), far);
     fill('skin', limb(e, w, [[0, 1.8, 1.9], [0.35, 1.9, 2.1], [1, 1.25, 1.3]]), far);
     fill('glove', limb(along(w, fa, -1.1), h, [[0, 1.45, 1.5], [0.5, 1.75, 1.7], [0.8, 2.1, 2.0], [1, 1.7, 1.6]]), far);
-    fill('red', band(along(w, fa, -0.9), along(w, fa, -0.1), 1.6, 1.65), far);
+    fill('strap', band(along(w, fa, -0.9), along(w, fa, -0.1), 1.6, 1.65), far);
     fill('cream', limb(s, along(s, sh, L.upper * 0.5), [[0, 3.5, 3.6], [1, 3.0, 3.0]]), far);
     fill('red', band(along(s, sh, L.upper * 0.47), along(s, sh, L.upper * 0.53), 3.0, 3.0), far);
   }
@@ -576,6 +576,8 @@ export function createRunner(root, stage = root) {
     const u = [(top[0] - base[0]) / L.torso, (top[1] - base[1]) / L.torso], fwd = [-u[1], u[0]];
     const frontW = (t) => { let i = 0; while (chest[i + 1][0] < t) i++; const [t0, w0] = chest[i], [t1, w1] = chest[i + 1]; return w0 + (w1 - w0) * (t - t0) / (t1 - t0); };
     stroke('red', line([0.3, 0.45, 0.6, 0.75, 0.88].map((t) => { const c = lerp(base, top, t), w = frontW(t) - 1.1; return [c[0] + fwd[0] * w, c[1] + fwd[1] * w]; })), false, 0.55);
+    const at = (t, w) => { const c = lerp(base, top, t); return [c[0] + fwd[0] * w, c[1] + fwd[1] * w]; };
+    stroke('red', line([at(0.9, 2.6), at(0.97, 1.2), at(0.985, -1.4), at(0.95, -3.2)]), false, 0.75); // collar trim
     fill('cream', limbUp(base, along(o, 180 - lean, 6.4), [[0, 4.9, 5.4], [1, 4.5, 4.2]]));
     fill('red', band(along(o, 180 - lean, 6.6), along(o, 180 - lean, 5.0), 4.55, 4.25));
     drawLeg(B.legN, false);
@@ -630,9 +632,10 @@ export function createRunner(root, stage = root) {
   const shade = (hex, k) => { const n = parseInt(hex.slice(1), 16); return `rgb(${((n >> 16) & 255) * k | 0},${((n >> 8) & 255) * k | 0},${(n & 255) * k | 0})`; };
   function colours() {
     const cs = getComputedStyle(root), v = (n) => cs.getPropertyValue(n).trim();
-    C = { skin: v('--skin'), hair: v('--hair'), cream: v('--cream'), red: v('--red'), glove: v('--navy'), sole: v('--sole'), spike: v('--spike'), shine: 'rgba(255,255,255,0.3)' };
+    C = { skin: v('--skin'), hair: v('--hair'), cream: v('--cream'), red: v('--red'), glove: v('--glove'), strap: v('--cream'), sole: v('--sole'), spike: v('--spike'), shine: 'rgba(255,255,255,0.3)' };
     C.far = {};
     for (const k in C) C.far[k] = /^#[0-9a-f]{6}$/i.test(C[k]) ? shade(C[k], 0.74) : C[k];
+    C.far.cream = C.far.strap = v('--cream-far'); // a warm cream in shadow, not grey
     C.outline = v('--outline');
   }
   // A bold dark outline around the whole silhouette (every shape stroked first, then filled
