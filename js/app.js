@@ -40,11 +40,11 @@ const S = {
   hist: { seg: 'speed', conn: 'all', range: 30 }, placing: null,
   video: { state: 'idle', result: null },
 };
-let gauge, swirl;
+let gauge, swirl, runner;
 
 // ---------- boot ----------
 async function boot() {
-  createRunner($('.runner'), $('.speed-stage'));
+  runner = createRunner($('.runner'), $('.speed-stage'));
   S.settings = await loadSettings();
   S.results = ((await results.all()) || []).sort((a, b) => a.ts - b.ts);
   S.outages = ((await outages.all()) || []).sort((a, b) => a.start - b.start);
@@ -153,6 +153,7 @@ async function runSpeed() {
   if (S.tab !== 'speed') show('speed');
   S.running = true; S.abort = new AbortController();
   const signal = S.abort.signal;
+  $('#goBtn').classList.add('leaving'); await runner.exit(); $('#goBtn').classList.remove('leaving'); // he sprints off, then the test starts
   $('#idleView').hidden = true; $('#resultView').hidden = true; $('#runView').hidden = false; $('#metrics').hidden = false;
   ['#mDown', '#mUp', '#mPing', '#mPingDown', '#mPingUp'].forEach((id) => ($(id).textContent = '–'));
   gauge.reset();

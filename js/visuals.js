@@ -599,25 +599,31 @@ export function createRunner(root, stage = root) {
 
   // Stumbles and falls. Every few bases (a fresh roll of 1-5 each time) a cleat catches the bag.
   // Usually he stumbles: pitches forward, arms flung out, losing some speed for a second. Sometimes
-  // he goes down: dives, lands on his belly in a puff of dust, slides to a stop, lies there a beat,
-  // pushes up to hands and knees, comes up on one knee, rises into a crouch and sprints off again.
+  // he goes down: dives, belly-flops with a bounce and a burst of dust, skids with his lower legs
+  // kicking up behind him until he stops, lies there a beat, pushes up to hands and knees, comes
+  // up on one knee, rises into a crouch and sprints off again.
   const FALL_CHANCE = 0.35, STUMBLE = 0.9, RISE = 1.4, RESUME_P = 0.82; // RESUME_P: the stride phase closest to the crouch
   const PRONE = { air: 0, lean: 88, hn: -86, kn: 18, an: -30, hf: -82, kf: 32, af: -30, sn: 100, en: 25, sf: 92, ef: 30, tw: 0, head: 55 };
+  const kick = (kn, kf) => ({ ...PRONE, kn, kf, an: -40, af: -40, sn: 104, en: 20, sf: 96, ef: 26 }); // skidding, lower legs flicking up
   const FALL = [
     [0.3, { air: 6, lean: 42, hn: -22, kn: 35, an: -10, hf: 38, kf: 75, af: 0, sn: 75, en: 35, sf: 55, ef: 30, tw: 0, head: -18 }], // tripped, pitching forward
-    [0.55, { air: 6, lean: 72, hn: -48, kn: 22, an: -25, hf: -30, kf: 45, af: -20, sn: 115, en: 15, sf: 105, ef: 20, tw: 0, head: 25 }], // diving, arms out
-    [0.75, PRONE], [1.75, PRONE], // lands, slides, lies there
-    [2.25, { air: 0, lean: 82, hn: -78, kn: 25, an: -30, hf: -74, kf: 35, af: -30, sn: -2, en: 4, sf: 2, ef: 4, tw: 0, head: 45 }], // pushes up on straight arms
-    [2.8, { air: 0, lean: 82, hn: 2, kn: 95, an: -30, hf: 6, kf: 100, af: -30, sn: 2, en: 6, sf: 6, ef: 6, tw: 0, head: 40 }], // hands and knees
-    [3.3, { air: 0, lean: 28, hn: 85, kn: 88, an: 2, hf: -8, kf: 100, af: -30, sn: 30, en: 60, sf: -20, ef: 55, tw: 0, head: 2 }], // up on one knee
-    [3.75, { air: 0, lean: 32, hn: 42, kn: 62, an: 12, hf: -22, kf: 42, af: -12, sn: -14, en: 82, sf: 32, ef: 82, tw: 0, head: -8 }], // rising into a crouch
+    [0.5, { air: 9, lean: 70, hn: -45, kn: 25, an: -25, hf: -28, kf: 45, af: -20, sn: 118, en: 12, sf: 108, ef: 18, tw: 0, head: 22 }], // diving, arms out
+    [0.66, { ...PRONE, kn: 40, kf: 55, sn: 112, sf: 102, head: 68 }], // plop: belly-flops onto the dirt
+    [0.76, { ...PRONE, air: 2.2, lean: 86, kn: 75, kf: 95, an: -40, af: -40, sn: 125, en: 35, sf: 118, ef: 40, head: 48 }], // bounces, arms and legs flung up
+    [0.86, { ...PRONE, kn: 55, kf: 30, head: 62 }], // slams back down
+    [0.98, kick(125, 45)], [1.1, kick(50, 120)], [1.22, kick(110, 55)], [1.34, kick(45, 95)], [1.46, kick(70, 40)], // skids, legs kicking back
+    [1.6, PRONE], [1.95, PRONE], // stops, lies there
+    [2.35, { air: 0, lean: 82, hn: -78, kn: 25, an: -30, hf: -74, kf: 35, af: -30, sn: -2, en: 4, sf: 2, ef: 4, tw: 0, head: 45 }], // pushes up on straight arms
+    [2.85, { air: 0, lean: 82, hn: 2, kn: 95, an: -30, hf: 6, kf: 100, af: -30, sn: 2, en: 6, sf: 6, ef: 6, tw: 0, head: 40 }], // hands and knees
+    [3.35, { air: 0, lean: 28, hn: 85, kn: 88, an: 2, hf: -8, kf: 100, af: -30, sn: 30, en: 60, sf: -20, ef: 55, tw: 0, head: 2 }], // up on one knee
+    [3.8, { air: 0, lean: 32, hn: 42, kn: 62, an: 12, hf: -22, kf: 42, af: -12, sn: -14, en: 82, sf: 32, ef: 82, tw: 0, head: -8 }], // rising into a crouch
   ];
-  const FALL_END = 3.95;
+  const FALL_END = 4.0;
   const ease = (x) => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
   // Ground speed as a share of full speed, s seconds into the current move.
   function pace(mode, s) {
     if (mode === 'stumble') return 1 - 0.4 * Math.sin(Math.PI * Math.min(1, s / STUMBLE));
-    if (mode === 'fall') return s < 0.75 ? 1 - 0.15 * s / 0.75 : s < 1.3 ? 0.85 * (1 - (s - 0.75) / 0.55) ** 2 : 0; // slides to a stop
+    if (mode === 'fall') return s < 0.66 ? 1 - 0.15 * s / 0.66 : s < 1.5 ? 0.6 * (1 - (s - 0.66) / 0.84) ** 1.6 : 0; // the plop costs speed, then he skids to a stop
     if (mode === 'rise') return 0.15 + 0.85 * ease(s / RISE);
     return 1;
   }
@@ -667,16 +673,27 @@ export function createRunner(root, stage = root) {
   const step = speed * K * CYCLE / 2, SL = 2 * step, ox = park.runX - HIP_X * K;
   const strikeX = ox + (legPose(0, [HIP_X + 0.9 * twist(0), 0]).a[0] + 2) * K; // middle of the planted cleat
   const roll = () => 1 + Math.floor(Math.random() * 5);
-  let raf = 0, t0 = 0, lastT = 0, dist = 0, pAt = 0, distAt = 0, baseX = null, toTrip = roll();
-  let mode = 'run', mT = 0, keys = null, Jlast = null, puffed = 0;
-  const phase = () => pAt + (dist - distAt) / SL;
+  // dist: ground scrolled past the camera; ran: ground he's covered (they differ only as he
+  // sprints off screen, when the camera stops following and xo is how far ahead he's got).
+  let raf = 0, t0 = 0, lastT = 0, dist = 0, ran = 0, xo = 0, pAt = 0, distAt = 0, baseX = null, toTrip = roll();
+  let mode = 'run', mT = 0, keys = null, Jlast = null, puffed = 0, gone = null, blendIn = 0;
+  const phase = () => pAt + (ran - distAt) / SL;
   function draw(t) {
     const dt = Math.min(0.1, Math.max(0, t - lastT)); lastT = t;
     if (mode === 'stumble' && t - mT >= STUMBLE) mode = 'run';
-    if (mode === 'fall' && t - mT >= FALL_END) { mode = 'rise'; mT = t; pAt = RESUME_P; distAt = dist; }
+    if (mode === 'fall' && t - mT >= FALL_END) { mode = 'rise'; mT = t; pAt = RESUME_P; distAt = ran; }
     if (mode === 'rise' && t - mT >= RISE) mode = 'run';
-    const p0 = phase(), moved = speed * K * pace(mode, t - mT) * dt;
-    dist += moved; if (baseX !== null) baseX -= moved;
+    // The crowd goes wild while he's down and getting up, gasps at a stumble, cheers him off, and calms down after.
+    park.cheer(mode === 'fall' || mode === 'rise' ? 1 : mode === 'exit' ? 0.7 : mode === 'stumble' ? 0.45 : 0);
+    const p0 = phase();
+    if (mode === 'exit') { // the camera stops following; he accelerates away
+      const s = t - mT, cam = Math.max(0, 1 - s / 0.4), boost = 1 + 0.8 * Math.min(1, s / 0.6);
+      dist += speed * K * cam * dt; ran += speed * K * boost * dt; xo += speed * K * (boost - cam) * dt;
+      if (baseX !== null) baseX -= speed * K * cam * dt;
+    } else {
+      const moved = speed * K * pace(mode, t - mT) * dt;
+      dist += moved; ran += moved; if (baseX !== null) baseX -= moved;
+    }
     const p = phase(), span = park.span(), running = mode === 'run' || mode === 'rise';
     // A cleat strike on the bag: impact and dust, and maybe the trip.
     if (running && raf && Math.floor(2 * p) !== Math.floor(2 * p0) && baseX !== null && Math.abs(baseX - strikeX) < 3) {
@@ -702,19 +719,31 @@ export function createRunner(root, stage = root) {
     } else {
       J = gaitJ(p);
       if (mode === 'stumble') J = stumbled(J, t - mT);
-      if (mode === 'rise' && t - mT < 0.35) J = mix(Jlast, J, ease((t - mT) / 0.35));
+      if ((mode === 'rise' || (mode === 'exit' && blendIn)) && t - mT < 0.35) J = mix(Jlast, J, ease((t - mT) / 0.35));
     }
     const ctx = park.draw(dist, t, baseX ?? -1e4);
     if (!ctx) return;
     const B = pose(J);
-    // Dust where he hits the ground, and along the slide.
+    // Dust where he belly-flops, where he lands again, and along the skid.
     if (mode === 'fall') {
-      const st = t - mT, chest = ox + lerp(B.base, B.top, 0.6)[0] * K;
-      for (const [at, n] of [[0.75, 16], [0.95, 8], [1.15, 5]]) if (puffed < at && st >= at) { park.puff(chest, t, n, 7); puffed = at; }
+      const st = t - mT, chest = ox + xo + lerp(B.base, B.top, 0.6)[0] * K;
+      for (const [at, n] of [[0.66, 22], [0.86, 12], [1.0, 6], [1.14, 6], [1.28, 4], [1.42, 3]]) if (puffed < at && st >= at) { park.puff(chest, t, n, 8); puffed = at; }
     }
-    ctx.save(); ctx.translate(ox, park.path - GROUND * K); ctx.scale(K, K);
+    ctx.save(); ctx.translate(ox + xo, park.path - GROUND * K); ctx.scale(K, K);
     render(ctx); ctx.restore();
     park.front(ctx, dist, t);
+    if (mode === 'exit' && ox + xo + (HIP_X - 25) * K > span[1]) { // out of sight: back to his spot for next time
+      mode = 'run'; xo = 0; const done = gone; gone = null; done();
+    }
+  }
+  // Tapping Run: he sprints off the right of the screen, then the test starts.
+  function exit() {
+    if (gone) return new Promise((r) => { const prev = gone; gone = () => { prev(); r(); }; });
+    if (!raf || reduceMotion() || !root.getClientRects().length) return Promise.resolve();
+    blendIn = mode === 'fall' || mode === 'rise';
+    if (mode === 'fall') { pAt = RESUME_P; distAt = ran; } // springs up and goes
+    mode = 'exit'; mT = lastT;
+    return new Promise((r) => { gone = r; });
   }
   function frame(now) {
     raf = requestAnimationFrame(frame);
@@ -727,7 +756,7 @@ export function createRunner(root, stage = root) {
   document.addEventListener('visibilitychange', () => (document.hidden ? stop() : start()));
   colours(); draw(0.25);
   start();
-  return { start, stop };
+  return { start, stop, exit };
 }
 
 // ---------- Ballpark (behind the runner) ----------
@@ -845,7 +874,11 @@ function createBallpark(root, stage, onRebuild) {
     return true;
   }
 
-  let ready = false, crowdAt = -1;
+  // The crowd's excitement (0 calm, 1 on its feet) eases toward a target the runner sets:
+  // up when he stumbles or goes down, back to calm once he's away again. Excited fans stand
+  // up, bounce higher and faster and sway harder; their beat runs on its own clock so a change
+  // of tempo doesn't make anyone jump.
+  let ready = false, crowdAt = -1, beat = 0, hype = 0, hypeTo = 0;
   function draw(d, t, bx) {
     if (!ready) ready = rebuild();
     if (!ready) return null;
@@ -853,14 +886,17 @@ function createBallpark(root, stage, onRebuild) {
     // hopping up (eased down) and swaying, each on their own beat, then haze.
     let g = crowd.g;
     if (Math.abs(t - crowdAt) >= 0.025) {
+      const dt = Math.min(0.1, Math.max(0, t - crowdAt));
       crowdAt = t;
+      hype += (hypeTo - hype) * Math.min(1, dt * (hypeTo > hype ? 6 : 1.2)); // erupts fast, settles slowly
+      beat += dt * (1 + 0.9 * hype);
       g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, crowd.c.width, crowd.c.height);
       world(crowd); g.fillStyle = C.seats;
       for (const [y, sc] of TIERS) g.fillRect(x0, y - 3.2 * sc, wU, 3.2 * sc);
       for (const fn of fans) {
-        const ph = (t / fn.period + fn.phase) % 1, hop = Math.sin(Math.PI * ph) ** 2;
+        const ph = (beat / fn.period + fn.phase) % 1, hop = Math.sin(Math.PI * ph) ** 2;
         world(crowd, fn.x, fn.y);
-        g.translate(0, -3.4 * fn.sc * hop); g.rotate(0.06 * fn.sway * Math.sin(2 * Math.PI * ph));
+        g.translate(0, -fn.sc * (3.4 * hop * (1 + 2.2 * hype) + 2.8 * hype)); g.rotate((0.06 + 0.14 * hype) * fn.sway * Math.sin(2 * Math.PI * ph));
         g.drawImage(fn.img, -6 * fn.sc, -15.5 * fn.sc, 12 * fn.sc, 17 * fn.sc);
       }
       world(crowd); g.fillStyle = C.haze; g.fillRect(x0, CROWD[0], wU, CROWD[1] - CROWD[0]); // aerial haze pushes the stands back
@@ -920,5 +956,5 @@ function createBallpark(root, stage, onRebuild) {
   const again = () => { ready = false; crowdAt = -1; onRebuild(); };
   if (window.ResizeObserver) { const ro = new ResizeObserver(again); ro.observe(root); if (stage !== root) ro.observe(stage); }
   matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', again);
-  return { draw, front, dust, puff, span: () => [x0, x0 + wU], path: PATH, runX: 56 };
+  return { draw, front, dust, puff, cheer: (level) => { hypeTo = level; }, span: () => [x0, x0 + wU], path: PATH, runX: 56 };
 }
