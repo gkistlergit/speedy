@@ -164,8 +164,9 @@ main { flex: 1; min-height: 0; position: relative; overflow: hidden; }
 /* ---------- video: a dark "screening room" in both themes ---------- */
 .video-tab { overflow: hidden; background: #0b0d12; --fg: #f2f4f7; --muted: #a3acbb; --line: rgba(242, 244, 247, 0.12); color: var(--fg); }
 #swirl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.video-overlay { position: absolute; inset: 0; overflow-y: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; text-align: center;
+.video-overlay { position: absolute; inset: 0; overflow-y: auto; display: flex; flex-direction: column; align-items: center; justify-content: safe center; gap: 16px; text-align: center;
   padding: 24px max(20px, env(safe-area-inset-right, 0px)) 24px max(20px, env(safe-area-inset-left, 0px)); background: radial-gradient(ellipse at center, rgba(11, 13, 18, 0.25), rgba(11, 13, 18, 0.78)); }
+.video-overlay > * { flex-shrink: 0; } /* results keep their height and the overlay scrolls, instead of rows being squeezed out */
 .video-overlay h2 { font-size: 28px; font-weight: 400; letter-spacing: -0.02em; }
 .video-overlay p { color: var(--muted); max-width: 34ch; margin: 0; }
 .video-overlay p b { color: var(--fg); }
